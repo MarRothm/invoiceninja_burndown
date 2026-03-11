@@ -51,9 +51,10 @@ export async function getBurndown(projectId) {
       ? new Date(project.start_date)
       : new Date(project.updated_at);
 
-  // End at the last booking date (Option A).
-  // If no bookings yet, fall back to deadline or today.
-  const endDate = lastEntryDate
+  // Archived = cancelled: end at last booking date.
+  // Active projects: end at deadline, or today if no deadline.
+  const isArchived = !!project.archived_at;
+  const endDate = isArchived && lastEntryDate
     ? new Date(lastEntryDate)
     : project.deadline
       ? new Date(project.deadline)

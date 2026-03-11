@@ -10,10 +10,14 @@ CREATE TABLE IF NOT EXISTS projects (
   budgeted_hours      NUMERIC(10, 2) NOT NULL DEFAULT 0,
   deadline            DATE,
   start_date          DATE,
+  archived_at         TIMESTAMPTZ,
   raw                 JSONB,
   synced_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Migration: Spalte nachrüsten falls Tabelle bereits existiert
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS time_entries (
   id                    SERIAL PRIMARY KEY,
