@@ -28,14 +28,6 @@ export async function getBurndown(projectId) {
 
   const budgeted = parseFloat(project.budgeted_hours) || 0;
 
-  // Determine date range
-  const startDate = project.start_date
-    ? new Date(project.start_date)
-    : new Date(project.updated_at);
-  const endDate = project.deadline
-    ? new Date(project.deadline)
-    : new Date();
-
   const today = new Date().toISOString().slice(0, 10);
 
   // Fetch all completed time entries for this project, summed per day
@@ -46,6 +38,26 @@ export async function getBurndown(projectId) {
     GROUP BY entry_date
     ORDER BY entry_date ASC
   `, [projectId]);
+
+  // Determine date range
+  // start = first booking (fallback: project.start_date or updated_at)
+  // end   = last booking or today (whichever is later), capped at deadline if set
+  const firstEntryDate = entriesRes.rows.length > 0 ? entriesRes.rows[0].date : null;
+  const lastEntryDate  = entriesRes.rows.length > 0 ? entriesRes.rows[entriesRes.rows.length - 1].date : null;
+
+  const startDate = firstEntryDate
+    ? new Date(firstEntryDate)
+    : project.start_date
+      ? new Date(project.start_date)
+      : new Date(project.updated_at);
+
+  // End at the last booking date (Option A).
+  // If no bookings yet, fall back to deadline or today.
+  const endDate = lastEntryDate
+    ? new Date(lastEntryDate)
+    : project.deadline
+      ? new Date(project.deadline)
+      : new Date();
 
   // Build lookup: date → logged hours that day
   const loggedByDate = {};
