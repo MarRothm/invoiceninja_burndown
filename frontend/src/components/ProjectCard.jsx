@@ -1,9 +1,11 @@
 import React from 'react';
 
 export default function ProjectCard({ project, selected, onClick }) {
-  const { name, progress, total_logged, budgeted_hours, remaining, deadline } = project;
-  const isOver = progress > 100;
-  const color  = isOver ? 'var(--accent2)' : 'var(--accent)';
+  const { name, progress, total_logged, budgeted_hours, deadline, actual_end_date, status } = project;
+  const isClosed = status === 'closed';
+  const isOver   = progress > 100;
+  const color    = isClosed ? 'var(--muted)' : isOver ? 'var(--accent2)' : 'var(--accent)';
+  const endDate  = actual_end_date || deadline;
 
   return (
     <button
@@ -18,11 +20,19 @@ export default function ProjectCard({ project, selected, onClick }) {
         padding:       '14px 16px',
         transition:    'border-color 0.15s, background 0.15s',
         cursor:        'pointer',
+        opacity:       isClosed ? 0.7 : 1,
       }}
     >
-      {/* Name */}
-      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', marginBottom: 8 }}>
-        {name}
+      {/* Name + Status-Badge */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', flex: 1 }}>{name}</span>
+        {isClosed && (
+          <span style={{
+            fontSize: 10, fontWeight: 600, letterSpacing: '0.05em',
+            padding: '2px 6px', borderRadius: 4,
+            background: 'var(--border)', color: 'var(--muted)',
+          }}>CLOSED</span>
+        )}
       </div>
 
       {/* Progress bar */}
@@ -40,7 +50,7 @@ export default function ProjectCard({ project, selected, onClick }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)' }}>
         <span style={{ color }}>{progress}%</span>
         <span>{total_logged}h / {budgeted_hours}h</span>
-        {deadline && <span>{new Date(deadline).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</span>}
+        {endDate && <span>{new Date(endDate).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</span>}
       </div>
     </button>
   );
