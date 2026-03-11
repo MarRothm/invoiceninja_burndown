@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   ResponsiveContainer, ComposedChart, Line, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
+  XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine,
 } from 'recharts';
 
 const fmt = d => {
@@ -56,14 +56,11 @@ export default function BurndownChart({ data, budgetedHours }) {
           tickFormatter={v => `${v}h`}
         />
         <Tooltip content={<CustomTooltip />} />
-        <Legend
-          wrapperStyle={{ fontSize: 12, color: 'var(--muted)', paddingTop: 12 }}
-        />
 
         {/* Daily logged hours as bars */}
         <Bar
           dataKey="logged"
-          name="Gebucht (Tag)"
+          name="Daily Logged"
           fill="rgba(163,230,53,0.18)"
           stroke="rgba(163,230,53,0.35)"
           strokeWidth={1}
@@ -97,7 +94,7 @@ export default function BurndownChart({ data, budgetedHours }) {
           x={today}
           stroke="var(--muted)"
           strokeDasharray="3 3"
-          label={{ value: 'Heute', fill: 'var(--muted)', fontSize: 11, position: 'insideTopRight' }}
+          label={{ value: 'Today', fill: 'var(--muted)', fontSize: 11, position: 'insideTopRight' }}
         />
       </ComposedChart>
     </ResponsiveContainer>

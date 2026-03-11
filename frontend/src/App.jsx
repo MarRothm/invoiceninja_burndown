@@ -188,9 +188,8 @@ export default function App() {
 
             {/* Legend note */}
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 14, display: 'flex', gap: 24 }}>
-              <span><span style={{ color: 'var(--accent3)' }}>──</span> Ideal-Linie</span>
-              <span><span style={{ color: 'var(--accent)' }}>──</span> Actual (kumuliert)</span>
-              <span><span style={{ color: 'rgba(163,230,53,0.5)' }}>▮</span> Gebucht pro Tag</span>
+              <span><span style={{ color: 'var(--accent3)' }}>──</span> Ideal</span>
+              <span><span style={{ color: 'var(--accent)' }}>──</span> Actual</span>
             </div>
           </>
         )}
