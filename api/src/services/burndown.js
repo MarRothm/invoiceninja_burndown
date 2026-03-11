@@ -1,0 +1,129 @@
+import { query } from '../db/pool.js';
+
+/**
+ * Generate an array of dates between start and end (inclusive).
+ */
+function dateRange(start, end) {
+  const dates = [];
+  const cur = new Date(start);
+  const fin = new Date(end);
+  while (cur <= fin) {
+    dates.push(cur.toISOString().slice(0, 10));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+}
+
+/**
+ * Calculate burndown data for a single project.
+ * Returns { project, burndown: [ { date, ideal, actual, logged } ] }
+ */
+export async function getBurndown(projectId) {
+  const projRes = await query(
+    'SELECT * FROM projects WHERE id = $1',
+    [projectId]
+  );
+  if (!projRes.rows.length) return null;
+  const project = projRes.rows[0];
+
+  const budgeted = parseFloat(project.budgeted_hours) || 0;
+
+  // Determine date range
+  const startDate = project.start_date
+    ? new Date(project.start_date)
+    : new Date(project.updated_at);
+  const endDate = project.deadline
+    ? new Date(project.deadline)
+    : new Date();
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Fetch all completed time entries for this project, summed per day
+  const entriesRes = await query(`
+    SELECT entry_date::text AS date, SUM(hours) AS hours
+    FROM time_entries
+    WHERE project_id = $1 AND status = 'completed'
+    GROUP BY entry_date
+    ORDER BY entry_date ASC
+  `, [projectId]);
+
+  // Build lookup: date → logged hours that day
+  const loggedByDate = {};
+  for (const row of entriesRes.rows) {
+    loggedByDate[row.date] = parseFloat(row.hours);
+  }
+
+  // Build burndown series
+  const dates    = dateRange(startDate.toISOString().slice(0, 10), endDate.toISOString().slice(0, 10));
+  const totalDays = Math.max(dates.length - 1, 1);
+  const burndown = [];
+  let cumulativeLogged = 0;
+
+  for (let i = 0; i < dates.length; i++) {
+    const date = dates[i];
+    cumulativeLogged += loggedByDate[date] ?? 0;
+
+    const ideal  = Math.max(budgeted - (budgeted / totalDays) * i, 0);
+    const actual = date <= today
+      ? Math.max(budgeted - cumulativeLogged, 0)
+      : null;   // future dates: no actual line
+
+    burndown.push({
+      date,
+      ideal:  Math.round(ideal * 100) / 100,
+      actual: actual !== null ? Math.round(actual * 100) / 100 : null,
+      logged: Math.round((loggedByDate[date] ?? 0) * 100) / 100,
+    });
+  }
+
+  // Summary stats
+  const totalLogged = Object.values(loggedByDate).reduce((a, b) => a + b, 0);
+  const remaining   = Math.max(budgeted - totalLogged, 0);
+  const progress    = budgeted > 0 ? Math.round((totalLogged / budgeted) * 100) : 0;
+
+  return {
+    project: {
+      id:             project.id,
+      name:           project.name,
+      budgeted_hours: budgeted,
+      deadline:       project.deadline,
+      start_date:     project.start_date,
+    },
+    stats: {
+      total_logged: Math.round(totalLogged * 100) / 100,
+      remaining:    Math.round(remaining * 100) / 100,
+      progress,
+    },
+    burndown,
+  };
+}
+
+/**
+ * List all projects with quick summary stats.
+ */
+export async function listProjectsWithStats() {
+  const res = await query(`
+    SELECT
+      p.id,
+      p.invoiceninja_id,
+      p.name,
+      p.budgeted_hours,
+      p.deadline,
+      p.start_date,
+      COALESCE(SUM(te.hours) FILTER (WHERE te.status = 'completed'), 0) AS total_logged
+    FROM projects p
+    LEFT JOIN time_entries te ON te.project_id = p.id
+    GROUP BY p.id
+    ORDER BY p.name ASC
+  `);
+
+  return res.rows.map(r => ({
+    ...r,
+    budgeted_hours: parseFloat(r.budgeted_hours),
+    total_logged:   parseFloat(r.total_logged),
+    remaining:      Math.max(parseFloat(r.budgeted_hours) - parseFloat(r.total_logged), 0),
+    progress:       r.budgeted_hours > 0
+      ? Math.round((parseFloat(r.total_logged) / parseFloat(r.budgeted_hours)) * 100)
+      : 0,
+  }));
+}

@@ -1,0 +1,111 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────
+#  Burndown Stack  –  Portainer Compose
+# ─────────────────────────────────────────────
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: burndown_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-burndown}
+      POSTGRES_USER:     ${POSTGRES_USER:-burndown}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - internal
+    healthcheck:
+      test:     ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-burndown}"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+
+  redis:
+    image: redis:7-alpine
+    container_name: burndown_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+    healthcheck:
+      test:     ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout:  3s
+      retries:  5
+
+  api:
+    build:
+      context:    ./api
+      dockerfile: Dockerfile
+    image: burndown/api:latest
+    container_name: burndown_api
+    restart: unless-stopped
+    environment:
+      NODE_ENV:              production
+      PORT:                  3000
+      DATABASE_URL:          postgres://${POSTGRES_USER:-burndown}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-burndown}
+      REDIS_URL:             redis://redis:6379
+      INVOICENINJA_URL:      ${INVOICENINJA_URL}
+      INVOICENINJA_API_KEY:  ${INVOICENINJA_API_KEY}
+      CORS_ORIGIN:           ${PUBLIC_URL:-*}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+    expose:
+      - "3000"
+
+  worker:
+    build:
+      context:    ./api
+      dockerfile: Dockerfile
+    container_name: burndown_worker
+    command: ["node", "src/worker.js"]
+    restart: unless-stopped
+    environment:
+      NODE_ENV:               production
+      DATABASE_URL:           postgres://${POSTGRES_USER:-burndown}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-burndown}
+      REDIS_URL:              redis://redis:6379
+      INVOICENINJA_URL:       ${INVOICENINJA_URL}
+      INVOICENINJA_API_KEY:   ${INVOICENINJA_API_KEY}
+      SYNC_INTERVAL_MINUTES:  ${SYNC_INTERVAL_MINUTES:-10}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+
+  frontend:
+    build:
+      context:    ./frontend
+      dockerfile: Dockerfile
+    image: burndown/frontend:latest
+    container_name: burndown_frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+    networks:
+      - internal
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  internal:
+    driver: bridge
+    internal: true
