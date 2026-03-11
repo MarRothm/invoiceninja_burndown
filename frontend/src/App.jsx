@@ -96,11 +96,11 @@ export default function App() {
             transition: 'opacity 0.15s',
           }}
         >
-          {syncing ? '↻ Syncing...' : '↻ Sync jetzt'}
+          {syncing ? '↻ Syncing...' : '↻ Sync now'}
         </button>
 
         {/* Project list */}
-        {loading && <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 24 }}>Lade...</div>}
+        {loading && <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 24 }}>Loading...</div>}
         {projects.map(p => (
           <ProjectCard
             key={p.id}
@@ -122,7 +122,7 @@ export default function App() {
 
         {!selected && !loading && (
           <div style={{ color: 'var(--muted)', fontSize: 14, marginTop: 60, textAlign: 'center' }}>
-            Kein Projekt ausgewählt.
+            No project selected.
           </div>
         )}
 
@@ -130,13 +130,13 @@ export default function App() {
           <>
             {/* Header */}
             <div style={{ marginBottom: 28 }}>
-              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>PROJEKT</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>PROJECT</div>
               <h1 style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.1 }}>
                 {selected.name}
               </h1>
               {selected.deadline && (
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-                  Deadline: {new Date(selected.deadline).toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' })}
+                  Deadline: {new Date(selected.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
                 </div>
               )}
             </div>
@@ -155,10 +155,10 @@ export default function App() {
               }}>
                 {[
                   { label: 'Budget', value: `${burndown.project.budgeted_hours}h` },
-                  { label: 'Gebucht', value: `${burndown.stats.total_logged}h`, color: 'var(--accent)' },
-                  { label: 'Verbleibend', value: `${burndown.stats.remaining}h`,
+                  { label: 'Logged', value: `${burndown.stats.total_logged}h`, color: 'var(--accent)' },
+                  { label: 'Remaining', value: `${burndown.stats.remaining}h`,
                     color: burndown.stats.remaining === 0 ? 'var(--accent2)' : 'var(--text)' },
-                  { label: 'Fortschritt', value: `${burndown.stats.progress}%`,
+                  { label: 'Progress', value: `${burndown.stats.progress}%`,
                     color: burndown.stats.progress > 100 ? 'var(--accent2)' : 'var(--accent3)' },
                 ].map(s => (
                   <div key={s.label} style={{ background: 'var(--card)', padding: '18px 0' }}>
@@ -178,11 +178,11 @@ export default function App() {
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>BURNDOWN CHART</div>
               {chartLoad && (
                 <div style={{ height: 360, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>
-                  Berechne...
+                  Calculating...
                 </div>
               )}
               {burndown && !chartLoad && (
-                <BurndownChart data={burndown.burndown} budgetedHours={burndown.project.budgeted_hours} />
+                <BurndownChart data={burndown.burndown} />
               )}
             </div>
 

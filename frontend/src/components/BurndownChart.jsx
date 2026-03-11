@@ -6,7 +6,7 @@ import {
 
 const fmt = d => {
   const date = new Date(d);
-  return date.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 };
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -30,7 +30,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-export default function BurndownChart({ data, budgetedHours }) {
+export default function BurndownChart({ data }) {
   const today = new Date().toISOString().slice(0, 10);
 
   return (

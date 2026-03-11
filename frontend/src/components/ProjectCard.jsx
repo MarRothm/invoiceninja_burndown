@@ -50,7 +50,7 @@ export default function ProjectCard({ project, selected, onClick }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)' }}>
         <span style={{ color }}>{progress}%</span>
         <span>{total_logged}h / {budgeted_hours}h</span>
-        {endDate && <span>{new Date(endDate).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}</span>}
+        {endDate && <span>{new Date(endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>}
       </div>
     </button>
   );
