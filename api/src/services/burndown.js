@@ -97,17 +97,20 @@ export async function getBurndown(projectId) {
   }
 
   // Summary stats
+  const isClosed    = !!project.actual_end_date;
   const totalLogged = Object.values(loggedByDate).reduce((a, b) => a + b, 0);
-  const remaining   = Math.max(budgeted - totalLogged, 0);
+  const remaining   = isClosed ? 0 : Math.max(budgeted - totalLogged, 0);
   const progress    = budgeted > 0 ? Math.round((totalLogged / budgeted) * 100) : 0;
 
   return {
     project: {
-      id:             project.id,
-      name:           project.name,
-      budgeted_hours: budgeted,
-      deadline:       project.deadline,
-      start_date:     project.start_date,
+      id:              project.id,
+      name:            project.name,
+      budgeted_hours:  budgeted,
+      deadline:        project.deadline,
+      actual_end_date: project.actual_end_date ?? null,
+      start_date:      project.start_date,
+      status:          isClosed ? 'closed' : 'in_progress',
     },
     stats: {
       total_logged: Math.round(totalLogged * 100) / 100,
@@ -129,6 +132,7 @@ export async function listProjectsWithStats() {
       p.name,
       p.budgeted_hours,
       p.deadline,
+      p.actual_end_date,
       p.start_date,
       COALESCE(SUM(te.hours) FILTER (WHERE te.status = 'completed'), 0) AS total_logged
     FROM projects p
@@ -137,13 +141,17 @@ export async function listProjectsWithStats() {
     ORDER BY p.name ASC
   `);
 
-  return res.rows.map(r => ({
-    ...r,
-    budgeted_hours: parseFloat(r.budgeted_hours),
-    total_logged:   parseFloat(r.total_logged),
-    remaining:      Math.max(parseFloat(r.budgeted_hours) - parseFloat(r.total_logged), 0),
-    progress:       r.budgeted_hours > 0
-      ? Math.round((parseFloat(r.total_logged) / parseFloat(r.budgeted_hours)) * 100)
-      : 0,
-  }));
+  return res.rows.map(r => {
+    const isClosed    = !!r.actual_end_date;
+    const budgeted    = parseFloat(r.budgeted_hours);
+    const totalLogged = parseFloat(r.total_logged);
+    return {
+      ...r,
+      budgeted_hours:  budgeted,
+      total_logged:    totalLogged,
+      remaining:       isClosed ? 0 : Math.max(budgeted - totalLogged, 0),
+      progress:        budgeted > 0 ? Math.round((totalLogged / budgeted) * 100) : 0,
+      status:          isClosed ? 'closed' : 'in_progress',
+    };
+  });
 }
