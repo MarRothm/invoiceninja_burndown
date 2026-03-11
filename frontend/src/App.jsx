@@ -5,7 +5,7 @@ import { fetchProjects, fetchBurndown, triggerSync } from './hooks/api.js';
 
 const Stat = ({ label, value, color }) => (
   <div style={{ textAlign: 'center' }}>
-    <div style={{ fontSize: 22, fontWeight: 700, color: color ?? 'var(--text)', fontFamily: "'Fraunces', serif", lineHeight: 1 }}>
+    <div style={{ fontSize: 22, fontWeight: 700, color: color ?? 'var(--text)', lineHeight: 1 }}>
       {value}
     </div>
     <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{label}</div>
@@ -74,7 +74,7 @@ export default function App() {
 
         {/* Logo */}
         <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700, color: 'var(--accent)' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)' }}>
             Burndown
           </div>
           <div style={{ fontSize: 11, color: 'var(--muted)' }}>via InvoiceNinja</div>
@@ -131,7 +131,7 @@ export default function App() {
             {/* Header */}
             <div style={{ marginBottom: 28 }}>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>PROJEKT</div>
-              <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 700, lineHeight: 1.1 }}>
+              <h1 style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.1 }}>
                 {selected.name}
               </h1>
               {selected.deadline && (

@@ -21,7 +21,7 @@ export default function ProjectCard({ project, selected, onClick }) {
       }}
     >
       {/* Name */}
-      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', marginBottom: 8, fontFamily: "'Fraunces', serif" }}>
+      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', marginBottom: 8 }}>
         {name}
       </div>
 
