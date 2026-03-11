@@ -11,13 +11,15 @@ CREATE TABLE IF NOT EXISTS projects (
   deadline            DATE,
   start_date          DATE,
   archived_at         TIMESTAMPTZ,
+  actual_end_date     DATE,
   raw                 JSONB,
   synced_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Migration: Spalte nachrüsten falls Tabelle bereits existiert
+-- Migration: Spalten nachrüsten falls Tabelle bereits existiert
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS actual_end_date DATE;
 
 CREATE TABLE IF NOT EXISTS time_entries (
   id                    SERIAL PRIMARY KEY,

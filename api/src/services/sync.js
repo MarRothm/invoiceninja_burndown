@@ -22,19 +22,22 @@ export async function syncProjects() {
   console.log(`[sync] ${projects.length} projects fetched`);
 
   for (const p of projects) {
-    const archivedAt = p.archived_at ? new Date(p.archived_at * 1000).toISOString() : null;
+    const archivedAt    = p.archived_at ? new Date(p.archived_at * 1000).toISOString() : null;
+    // custom_value2 = tatsächliches Projektende (YYYY-MM-DD), z.B. bei Abbruch
+    const actualEndDate = p.custom_value2?.trim() || null;
     await query(`
-      INSERT INTO projects (invoiceninja_id, name, budgeted_hours, deadline, start_date, archived_at, raw, synced_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+      INSERT INTO projects (invoiceninja_id, name, budgeted_hours, deadline, start_date, archived_at, actual_end_date, raw, synced_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
       ON CONFLICT (invoiceninja_id) DO UPDATE SET
-        name           = EXCLUDED.name,
-        budgeted_hours = EXCLUDED.budgeted_hours,
-        deadline       = EXCLUDED.deadline,
-        start_date     = EXCLUDED.start_date,
-        archived_at    = EXCLUDED.archived_at,
-        raw            = EXCLUDED.raw,
-        synced_at      = NOW(),
-        updated_at     = NOW()
+        name            = EXCLUDED.name,
+        budgeted_hours  = EXCLUDED.budgeted_hours,
+        deadline        = EXCLUDED.deadline,
+        start_date      = EXCLUDED.start_date,
+        archived_at     = EXCLUDED.archived_at,
+        actual_end_date = EXCLUDED.actual_end_date,
+        raw             = EXCLUDED.raw,
+        synced_at       = NOW(),
+        updated_at      = NOW()
     `, [
       p.id,
       p.name,
@@ -42,6 +45,7 @@ export async function syncProjects() {
       p.due_date || null,
       p.created_at ? new Date(p.created_at * 1000).toISOString().slice(0, 10) : null,
       archivedAt,
+      actualEndDate,
       JSON.stringify(p),
     ]);
   }

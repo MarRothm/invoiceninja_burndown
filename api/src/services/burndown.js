@@ -43,7 +43,6 @@ export async function getBurndown(projectId) {
   // start = first booking (fallback: project.start_date or updated_at)
   // end   = last booking or today (whichever is later), capped at deadline if set
   const firstEntryDate = entriesRes.rows.length > 0 ? entriesRes.rows[0].date : null;
-  const lastEntryDate  = entriesRes.rows.length > 0 ? entriesRes.rows[entriesRes.rows.length - 1].date : null;
 
   const startDate = firstEntryDate
     ? new Date(firstEntryDate)
@@ -51,11 +50,9 @@ export async function getBurndown(projectId) {
       ? new Date(project.start_date)
       : new Date(project.updated_at);
 
-  // Archived = cancelled: end at last booking date.
-  // Active projects: end at deadline, or today if no deadline.
-  const isArchived = !!project.archived_at;
-  const endDate = isArchived && lastEntryDate
-    ? new Date(lastEntryDate)
+  // End date priority: custom_value2 (actual_end_date) → deadline → today
+  const endDate = project.actual_end_date
+    ? new Date(project.actual_end_date)
     : project.deadline
       ? new Date(project.deadline)
       : new Date();
