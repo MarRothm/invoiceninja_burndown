@@ -139,7 +139,9 @@ export async function listProjectsWithStats() {
     FROM projects p
     LEFT JOIN time_entries te ON te.project_id = p.id
     GROUP BY p.id
-    ORDER BY p.name ASC
+    ORDER BY
+      CASE WHEN p.actual_end_date IS NOT NULL OR (p.deadline IS NOT NULL AND p.deadline <= CURRENT_DATE) THEN 1 ELSE 0 END ASC,
+      p.start_date DESC NULLS LAST
   `);
 
   const today = new Date().toISOString().slice(0, 10);
