@@ -50,12 +50,17 @@ export async function getBurndown(projectId) {
       ? new Date(project.start_date)
       : new Date(project.updated_at);
 
-  // End date priority: custom_value2 (actual_end_date) → deadline → today
-  const endDate = project.actual_end_date
+  // chartEndDate: where the chart stops (actual_end_date if cancelled, else deadline or today)
+  // planEndDate:  original planned end for the ideal line slope (always deadline or today)
+  const chartEndDate = project.actual_end_date
     ? new Date(project.actual_end_date)
     : project.deadline
       ? new Date(project.deadline)
       : new Date();
+
+  const planEndDate = project.deadline
+    ? new Date(project.deadline)
+    : chartEndDate;
 
   // Build lookup: date → logged hours that day
   const loggedByDate = {};
@@ -64,8 +69,13 @@ export async function getBurndown(projectId) {
   }
 
   // Build burndown series
-  const dates    = dateRange(startDate.toISOString().slice(0, 10), endDate.toISOString().slice(0, 10));
-  const totalDays = Math.max(dates.length - 1, 1);
+  // totalDays based on original plan (startDate → planEndDate) so ideal slope is unaffected by cancellation
+  const startStr   = startDate.toISOString().slice(0, 10);
+  const planDays   = Math.max(
+    Math.round((planEndDate - startDate) / 86400000),
+    1
+  );
+  const dates    = dateRange(startStr, chartEndDate.toISOString().slice(0, 10));
   const burndown = [];
   let cumulativeLogged = 0;
 
@@ -73,7 +83,7 @@ export async function getBurndown(projectId) {
     const date = dates[i];
     cumulativeLogged += loggedByDate[date] ?? 0;
 
-    const ideal  = Math.max(budgeted - (budgeted / totalDays) * i, 0);
+    const ideal  = Math.max(budgeted - (budgeted / planDays) * i, 0);
     const actual = date <= today
       ? Math.max(budgeted - cumulativeLogged, 0)
       : null;   // future dates: no actual line
