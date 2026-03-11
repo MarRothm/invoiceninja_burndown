@@ -97,7 +97,7 @@ export async function getBurndown(projectId) {
   }
 
   // Summary stats
-  const isClosed    = !!project.actual_end_date;
+  const isClosed    = !!project.actual_end_date || (!!project.deadline && project.deadline <= today);
   const totalLogged = Object.values(loggedByDate).reduce((a, b) => a + b, 0);
   const remaining   = isClosed ? 0 : Math.max(budgeted - totalLogged, 0);
   const progress    = budgeted > 0 ? Math.round((totalLogged / budgeted) * 100) : 0;
@@ -141,8 +141,9 @@ export async function listProjectsWithStats() {
     ORDER BY p.name ASC
   `);
 
+  const today = new Date().toISOString().slice(0, 10);
   return res.rows.map(r => {
-    const isClosed    = !!r.actual_end_date;
+    const isClosed    = !!r.actual_end_date || (!!r.deadline && r.deadline <= today);
     const budgeted    = parseFloat(r.budgeted_hours);
     const totalLogged = parseFloat(r.total_logged);
     return {
