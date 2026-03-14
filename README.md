@@ -1,5 +1,8 @@
 # Burndown Stack
 
+[![Tests](https://github.com/MarRothm/burndown/actions/workflows/test.yml/badge.svg)](https://github.com/MarRothm/burndown/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 Projekt-Burndowns aus InvoiceNinja — als eigener Portainer Stack.
 
 ## Voraussetzungen
