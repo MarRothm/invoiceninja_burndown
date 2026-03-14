@@ -1,6 +1,6 @@
 -- ─────────────────────────────────────────────
---  Burndown Stack  –  Datenbankschema
---  Wird beim ersten Start automatisch ausgeführt
+--  Burndown Stack  –  Database Schema
+--  Executed automatically on first startup
 -- ─────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS projects (
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS projects (
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Migration: Spalten nachrüsten falls Tabelle bereits existiert
+-- Migration: add columns if table already exists
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS actual_end_date DATE;
 
@@ -32,12 +32,12 @@ CREATE TABLE IF NOT EXISTS time_entries (
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Primär-Index für Burndown-Abfragen
+-- Primary index for burndown queries
 CREATE INDEX IF NOT EXISTS idx_time_entries_project_date
   ON time_entries (project_id, entry_date)
   WHERE status = 'completed';
 
--- Index für schnelles Löschen per Task-ID beim Re-Sync
+-- Index for fast deletion by task ID during re-sync
 CREATE INDEX IF NOT EXISTS idx_time_entries_task_id
   ON time_entries (invoiceninja_task_id);
 
