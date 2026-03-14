@@ -23,7 +23,7 @@ export async function syncProjects() {
 
   for (const p of projects) {
     const archivedAt    = p.archived_at ? new Date(p.archived_at * 1000).toISOString() : null;
-    // custom_value2 = tatsächliches Projektende (YYYY-MM-DD), z.B. bei Abbruch
+    // custom_value2 = actual project end date (YYYY-MM-DD), e.g. when cancelled early
     const actualEndDate = p.custom_value2?.trim() || null;
     await query(`
       INSERT INTO projects (invoiceninja_id, name, budgeted_hours, deadline, start_date, archived_at, actual_end_date, raw, synced_at, updated_at)
