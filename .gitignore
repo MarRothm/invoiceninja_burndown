@@ -20,3 +20,6 @@ npm-debug.log*
 # OS artefacts
 .DS_Store
 Thumbs.db
+
+# Editor
+*.code-workspace
