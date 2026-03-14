@@ -5,14 +5,21 @@
   "scripts": {
     "start": "node src/server.js",
     "worker": "node src/worker.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "fastify": "^4.26.0",
     "@fastify/cors": "^9.0.1",
-    "pg": "^8.11.3",
+    "@fastify/helmet": "^11.1.1",
+    "@fastify/rate-limit": "^9.1.0",
+    "dotenv": "^16.4.1",
+    "fastify": "^4.26.0",
     "ioredis": "^5.3.2",
     "node-cron": "^3.0.3",
-    "dotenv": "^16.4.1"
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.0"
   }
 }

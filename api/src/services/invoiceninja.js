@@ -28,21 +28,35 @@ export async function fetchProjects(updatedAfter) {
 
 /**
  * Fetch all tasks (time entries) updated after a given ISO timestamp.
- * InvoiceNinja tasks carry time_log entries which represent individual time blocks.
+ * Handles pagination automatically to avoid the 500-record cap.
  */
 export async function fetchTasks(updatedAfter) {
-  const params = {
+  const perPage = 500;
+  const baseParams = {
     updated_at: updatedAfter ? Math.floor(new Date(updatedAfter).getTime() / 1000) : undefined,
-    per_page: 500,
+    per_page: perPage,
   };
-  const data = await apiFetch('/tasks', params);
-  return data.data ?? [];
+
+  const all = [];
+  let page = 1;
+
+  while (true) {
+    const data = await apiFetch('/tasks', { ...baseParams, page });
+    const records = data.data ?? [];
+    all.push(...records);
+
+    // Stop when we got fewer records than the page size (last page)
+    if (records.length < perPage) break;
+    page++;
+  }
+
+  return all;
 }
 
 /**
  * Expand InvoiceNinja task time_log into individual time entry records.
  * time_log is an array of [start_unix, end_unix] pairs.
- * Only entries where end > 0 (completed) are included.
+ * Only entries where end > 0 (completed) and hours > 0 are included.
  */
 export function expandTimeEntries(task) {
   if (!task.time_log) return [];
@@ -54,8 +68,11 @@ export function expandTimeEntries(task) {
     return [];
   }
 
+  if (!Array.isArray(logs)) return [];
+
   return logs
-    .filter(([, end]) => end > 0)  // only completed (end timestamp set)
+    .filter((entry) => Array.isArray(entry) && entry.length >= 2)
+    .filter(([, end]) => end > 0)              // only completed (end timestamp set)
     .map(([start, end]) => {
       const hours = (end - start) / 3600;
       const date  = new Date(start * 1000).toISOString().slice(0, 10);
@@ -66,5 +83,6 @@ export function expandTimeEntries(task) {
         entry_date: date,
         status: 'completed',
       };
-    });
+    })
+    .filter((e) => e.hours > 0);              // discard zero/negative durations
 }
