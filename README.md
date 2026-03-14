@@ -9,6 +9,7 @@ Project burndowns from InvoiceNinja — as a self-hosted Portainer stack.
 
 - Docker + Docker Compose (or Portainer)
 - Running InvoiceNinja instance with API access
+- InvoiceNinja project **Custom Field 2** configured as a date field — used to store the project cancellation/early-end date
 - (Optional) Traefik with `traefik_proxy` network for HTTPS
 
 ## Quick Start
