@@ -1,0 +1,72 @@
+name: License Check
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # Every Monday at 08:00 UTC
+  push:
+    paths:
+      - 'api/package.json'
+      - 'frontend/package.json'
+  pull_request:
+    paths:
+      - 'api/package.json'
+      - 'frontend/package.json'
+  workflow_dispatch:
+
+jobs:
+  license-check:
+    name: Check OSS Licenses
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install license-checker (API)
+        working-directory: api
+        run: npm install --ignore-scripts
+
+      - name: Install license-checker (Frontend)
+        working-directory: frontend
+        run: npm install --ignore-scripts
+
+      - name: Install license-checker CLI
+        run: npm install -g license-checker
+
+      - name: Check API licenses
+        working-directory: api
+        run: |
+          license-checker \
+            --onlyAllow "MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;CC0-1.0;Unlicense;0BSD;Python-2.0;BlueOak-1.0.0" \
+            --excludePrivatePackages \
+            --production \
+            --summary
+
+      - name: Check Frontend licenses
+        working-directory: frontend
+        run: |
+          license-checker \
+            --onlyAllow "MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;CC0-1.0;Unlicense;0BSD;Python-2.0;BlueOak-1.0.0" \
+            --excludePrivatePackages \
+            --production \
+            --summary
+
+      - name: Generate combined license report
+        run: |
+          echo "# License Report ($(date -u +%Y-%m-%d))" > license-report.txt
+          echo "" >> license-report.txt
+          echo "## API" >> license-report.txt
+          cd api && license-checker --excludePrivatePackages --production --csv >> ../license-report.txt
+          echo "" >> ../license-report.txt
+          echo "## Frontend" >> ../license-report.txt
+          cd ../frontend && license-checker --excludePrivatePackages --production --csv >> ../license-report.txt
+
+      - name: Upload license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: license-report.txt
+          retention-days: 90
