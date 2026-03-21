@@ -11,6 +11,7 @@ services:
       context:    .
       dockerfile: postgres/Dockerfile
     image: burndown/postgres:latest
+    pull_policy: never
     container_name: burndown_postgres
     restart: unless-stopped
     environment:
@@ -47,6 +48,7 @@ services:
       context:    ./api
       dockerfile: Dockerfile
     image: burndown/api:latest
+    pull_policy: never
     container_name: burndown_api
     restart: unless-stopped
     environment:
@@ -73,6 +75,7 @@ services:
       context:    ./api
       dockerfile: Dockerfile
     image: burndown/worker:latest
+    pull_policy: never
     container_name: burndown_worker
     command: ["node", "src/worker.js"]
     restart: unless-stopped
@@ -97,6 +100,7 @@ services:
       context:    ./frontend
       dockerfile: Dockerfile
     image: burndown/frontend:latest
+    pull_policy: never
     container_name: burndown_frontend
     restart: unless-stopped
     depends_on:
