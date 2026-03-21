@@ -72,6 +72,7 @@ services:
     build:
       context:    ./api
       dockerfile: Dockerfile
+    image: burndown/worker:latest
     container_name: burndown_worker
     command: ["node", "src/worker.js"]
     restart: unless-stopped
