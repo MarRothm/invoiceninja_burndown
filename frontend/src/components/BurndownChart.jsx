@@ -89,6 +89,18 @@ export default function BurndownChart({ data }) {
           connectNulls={false}
         />
 
+        {/* Forecast line – lineare Verlängerung der Ist-Linie */}
+        <Line
+          dataKey="forecast"
+          name="Forecast"
+          stroke="var(--accent2)"
+          strokeWidth={1.5}
+          strokeDasharray="5 4"
+          dot={false}
+          activeDot={{ r: 4, fill: 'var(--accent2)' }}
+          connectNulls={false}
+        />
+
         {/* Today reference line */}
         <ReferenceLine
           x={today}

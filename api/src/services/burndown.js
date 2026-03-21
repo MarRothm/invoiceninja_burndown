@@ -90,9 +90,10 @@ export async function getBurndown(projectId) {
 
     burndown.push({
       date,
-      ideal:  Math.round(ideal * 100) / 100,
-      actual: actual !== null ? Math.round(actual * 100) / 100 : null,
-      logged: Math.round((loggedByDate[date] ?? 0) * 100) / 100,
+      ideal:    Math.round(ideal * 100) / 100,
+      actual:   actual !== null ? Math.round(actual * 100) / 100 : null,
+      logged:   Math.round((loggedByDate[date] ?? 0) * 100) / 100,
+      forecast: null,
     });
   }
 
@@ -102,6 +103,25 @@ export async function getBurndown(projectId) {
   const totalLogged = Object.values(loggedByDate).reduce((a, b) => a + b, 0);
   const remaining   = isClosed ? 0 : Math.max(budgeted - totalLogged, 0);
   const progress    = budgeted > 0 ? Math.round((totalLogged / budgeted) * 100) : 0;
+
+  // Forecast: verlängert die Ist-Linie linear in die Zukunft (nur für offene Projekte)
+  if (!isClosed) {
+    let lastActualIdx = -1;
+    for (let i = burndown.length - 1; i >= 0; i--) {
+      if (burndown[i].actual !== null) { lastActualIdx = i; break; }
+    }
+    if (lastActualIdx > 0) {
+      const lastActual  = burndown[lastActualIdx].actual;
+      const dailyRate   = (budgeted - lastActual) / lastActualIdx; // Ø Stunden/Tag verbraucht
+      burndown[lastActualIdx].forecast = lastActual;               // Ankerpunkt = heute
+      for (let i = lastActualIdx + 1; i < burndown.length; i++) {
+        burndown[i].forecast = Math.max(
+          Math.round((lastActual - dailyRate * (i - lastActualIdx)) * 100) / 100,
+          0
+        );
+      }
+    }
+  }
 
   return {
     project: {
