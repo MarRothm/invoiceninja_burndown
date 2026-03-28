@@ -106,7 +106,7 @@ services:
     depends_on:
       - api
     ports:
-      - "8088:80"
+      - "6088:80"
     networks:
       - internal
 
