@@ -24,7 +24,7 @@ cp .env.example .env
 docker compose up -d --build
 
 # 3. Open browser
-# http://localhost  (or your domain)
+# http://localhost:6088  (or your domain)
 ```
 
 ## Environment Variables (.env)
@@ -93,7 +93,7 @@ Remove the `labels` from the `frontend` service in `docker-compose.yml` and expo
 ```yaml
 frontend:
   ports:
-    - "8080:80"
+    - "6088:80"
   networks:
     - internal   # remove proxy network
 ```
