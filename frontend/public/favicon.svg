@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Background -->
+  <rect width="32" height="32" rx="7" fill="#6366f1"/>
+  <!-- Y-Achse -->
+  <line x1="6" y1="5" x2="6" y2="26" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- X-Achse -->
+  <line x1="6" y1="26" x2="27" y2="26" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Ideallinie (gestrichelt) -->
+  <line x1="6" y1="8" x2="26" y2="25" stroke="rgba(255,255,255,0.35)" stroke-width="1.5" stroke-dasharray="2.5 2" stroke-linecap="round"/>
+  <!-- Burndown-Linie (solid, weiß) -->
+  <polyline points="6,8 11,11 17,16 22,21 26,25" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
