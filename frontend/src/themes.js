@@ -1,6 +1,6 @@
 export const themes = {
   invoiceninja: {
-    name: 'InvoiceNinja',
+    name: 'InvoiceNinja dark',
     vars: {
       '--bg':        '#1b1e2e',
       '--surface':   '#22263b',
@@ -19,7 +19,7 @@ export const themes = {
   },
 
   dark: {
-    name: 'Dark',
+    name: 'Venom Green',
     vars: {
       '--bg':        '#0d0f0e',
       '--surface':   '#141716',
@@ -38,7 +38,7 @@ export const themes = {
   },
 
   light: {
-    name: 'Hell',
+    name: 'InvoiceNinja light',
     vars: {
       '--bg':        '#f1f5f9',
       '--surface':   '#ffffff',
