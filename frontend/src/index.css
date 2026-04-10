@@ -1,14 +1,16 @@
 :root {
-  --bg:       #0d0f0e;
-  --surface:  #141716;
-  --card:     #191c1a;
-  --border:   #232825;
-  --text:     #e8ede9;
-  --muted:    #5c6660;
-  --accent:   #a3e635;       /* lime */
-  --accent2:  #fb923c;       /* orange – over budget */
-  --accent3:  #38bdf8;       /* sky – ideal line */
-  --danger:   #f87171;
+  /* Default: InvoiceNinja theme – overwritten at runtime by useTheme() */
+  --bg:        #1b1e2e;
+  --surface:   #22263b;
+  --card:      #272b42;
+  --border:    #323760;
+  --text:      #e2e8f0;
+  --muted:     #8892b0;
+  --accent:    #6366f1;
+  --accent2:   #f59e0b;
+  --accent3:   #22d3ee;
+  --danger:    #f87171;
+  --dot-color: rgba(99,102,241,0.07);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -29,7 +31,7 @@ body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background-image: radial-gradient(circle, rgba(163,230,53,0.06) 1px, transparent 1px);
+  background-image: radial-gradient(circle, var(--dot-color) 1px, transparent 1px);
   background-size: 28px 28px;
   pointer-events: none;
   z-index: 0;

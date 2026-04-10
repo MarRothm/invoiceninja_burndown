@@ -30,7 +30,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-export default function BurndownChart({ data }) {
+export default function BurndownChart({ data, barFill, barStroke }) {
   const today = new Date().toISOString().slice(0, 10);
 
   return (
@@ -61,8 +61,8 @@ export default function BurndownChart({ data }) {
         <Bar
           dataKey="logged"
           name="Daily Logged"
-          fill="rgba(163,230,53,0.18)"
-          stroke="rgba(163,230,53,0.35)"
+          fill={barFill}
+          stroke={barStroke}
           strokeWidth={1}
           radius={[2, 2, 0, 0]}
         />
