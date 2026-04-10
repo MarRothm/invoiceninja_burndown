@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ProjectCard from './components/ProjectCard.jsx';
 import BurndownChart from './components/BurndownChart.jsx';
+import ThemeSelector from './components/ThemeSelector.jsx';
 import { fetchProjects, fetchBurndown, triggerSync } from './hooks/api.js';
+import { useTheme } from './hooks/useTheme.js';
 
 const Stat = ({ label, value, color }) => (
   <div style={{ textAlign: 'center' }}>
@@ -13,6 +15,8 @@ const Stat = ({ label, value, color }) => (
 );
 
 export default function App() {
+  const { themeKey, setThemeKey, theme } = useTheme();
+
   const [projects,   setProjects]   = useState([]);
   const [selected,   setSelected]   = useState(null);
   const [burndown,   setBurndown]   = useState(null);
@@ -109,6 +113,9 @@ export default function App() {
             onClick={() => setSelected(p)}
           />
         ))}
+
+        <div style={{ flex: 1 }} />
+        <ThemeSelector themeKey={themeKey} setThemeKey={setThemeKey} />
       </aside>
 
       {/* ── Main ── */}
@@ -182,7 +189,11 @@ export default function App() {
                 </div>
               )}
               {burndown && !chartLoad && (
-                <BurndownChart data={burndown.burndown} />
+                <BurndownChart
+                  data={burndown.burndown}
+                  barFill={theme.barFill}
+                  barStroke={theme.barStroke}
+                />
               )}
             </div>
 
