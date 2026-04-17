@@ -65,7 +65,7 @@ export default function App() {
     <div style={{ display: 'flex', minHeight: '100vh' }}>
 
       {/* ── Sidebar ── */}
-      <aside style={{
+      <aside className="sidebar" style={{
         width: 260,
         flexShrink: 0,
         borderRight: '1px solid var(--border)',
