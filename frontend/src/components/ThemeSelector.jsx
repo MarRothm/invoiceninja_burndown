@@ -15,7 +15,7 @@ export default function ThemeSelector({ themeKey, setThemeKey }) {
           padding: '6px 8px',
           background: 'var(--surface)',
           border: '1px solid var(--border)',
-          borderRadius: 6,
+          borderRadius: 4,
           color: 'var(--text)',
           fontSize: 12,
           cursor: 'pointer',

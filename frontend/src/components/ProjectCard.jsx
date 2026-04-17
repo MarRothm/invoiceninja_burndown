@@ -16,9 +16,9 @@ export default function ProjectCard({ project, selected, onClick }) {
         textAlign:     'left',
         background:    selected ? 'var(--card)' : 'transparent',
         border:        `1px solid ${selected ? color : 'var(--border)'}`,
-        borderRadius:  8,
-        padding:       '14px 16px',
-        transition:    'border-color 0.15s, background 0.15s',
+        borderRadius:  4,
+        padding:       '12px 14px',
+        transition:    'border-color 0.15s ease-in-out, background 0.15s ease-in-out',
         cursor:        'pointer',
         opacity:       isClosed ? 0.7 : 1,
       }}
@@ -29,14 +29,14 @@ export default function ProjectCard({ project, selected, onClick }) {
         {isClosed && (
           <span style={{
             fontSize: 10, fontWeight: 600, letterSpacing: '0.05em',
-            padding: '2px 6px', borderRadius: 4,
+            padding: '2px 5px', borderRadius: 3,
             background: 'var(--border)', color: 'var(--muted)',
           }}>CLOSED</span>
         )}
       </div>
 
       {/* Progress bar */}
-      <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, marginBottom: 8, overflow: 'hidden' }}>
+      <div style={{ height: 3, background: 'var(--border)', borderRadius: 2, marginBottom: 8, overflow: 'hidden' }}>
         <div style={{
           height: '100%',
           width: `${Math.min(progress, 100)}%`,

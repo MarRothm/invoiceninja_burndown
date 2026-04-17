@@ -93,11 +93,11 @@ export default function App() {
             padding: '8px 12px',
             background: 'var(--surface)',
             border: '1px solid var(--border)',
-            borderRadius: 6,
+            borderRadius: 4,
             color: syncing ? 'var(--muted)' : 'var(--accent)',
             fontSize: 12,
             marginBottom: 8,
-            transition: 'opacity 0.15s',
+            transition: 'opacity 0.15s ease-in-out',
           }}
         >
           {syncing ? '↻ Syncing...' : '↻ Sync now'}
@@ -122,7 +122,7 @@ export default function App() {
       <main style={{ flex: 1, padding: '32px 36px', overflowY: 'auto' }}>
 
         {error && (
-          <div style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid var(--danger)', borderRadius: 8, padding: '12px 16px', fontSize: 12, color: 'var(--danger)', marginBottom: 20 }}>
+          <div style={{ background: 'rgba(218,72,48,0.08)', border: '1px solid var(--danger)', borderRadius: 4, padding: '12px 16px', fontSize: 12, color: 'var(--danger)', marginBottom: 20 }}>
             {error} <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: 'var(--danger)', float: 'right' }}>✕</button>
           </div>
         )}
@@ -156,7 +156,7 @@ export default function App() {
                 gap: 1,
                 background: 'var(--border)',
                 border: '1px solid var(--border)',
-                borderRadius: 10,
+                borderRadius: 4,
                 overflow: 'hidden',
                 marginBottom: 28,
               }}>
@@ -179,7 +179,7 @@ export default function App() {
             <div style={{
               background: 'var(--card)',
               border: '1px solid var(--border)',
-              borderRadius: 10,
+              borderRadius: 4,
               padding: '24px 20px 16px',
             }}>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>BURNDOWN CHART</div>
