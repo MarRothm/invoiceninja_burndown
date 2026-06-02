@@ -44,6 +44,23 @@ services:
       timeout:  3s
       retries:  5
 
+  ollama:
+    image: ollama/ollama
+    container_name: burndown_ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./ollama/entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    networks:
+      - internal
+    healthcheck:
+      test:     ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      interval: 30s
+      timeout:  10s
+      retries:  20
+      start_period: 300s
+
   api:
     build:
       context:    ./api
@@ -60,6 +77,9 @@ services:
       INVOICENINJA_URL:      ${INVOICENINJA_URL}
       INVOICENINJA_API_KEY:  ${INVOICENINJA_API_KEY}
       CORS_ORIGIN:           ${PUBLIC_URL:-*}
+      OLLAMA_URL:            http://ollama:11434
+    volumes:
+      - ./dashboard.declaration.md:/app/dashboard.declaration.md:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -114,6 +134,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  ollama_data:
 
 networks:
   internal:
