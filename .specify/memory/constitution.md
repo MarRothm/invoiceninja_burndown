@@ -1,6 +1,9 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 1.0.0 → 1.1.0
+- Added: README.md currency rule to Development Workflow (MINOR — new enforceable requirement)
+
 Version change: [template] → 1.0.0 (initial ratification — all placeholders resolved)
 
 Modified principles: N/A (first constitution, no prior version)
@@ -114,6 +117,11 @@ MAJOR version bump to the constitution.
   and task list (`/speckit-tasks`) before implementation begins.
 - **Docker-first validation**: UI and integration changes MUST be validated via
   `docker compose up -d --build` in a local environment before a PR is opened.
+- **README currency**: `README.md` MUST accurately reflect the current state of the
+  stack at all times. Any PR that adds, removes, or changes a service, API endpoint,
+  environment variable, deployment step, or major feature MUST include a corresponding
+  `README.md` update in the same commit. A PR that modifies the stack without updating
+  `README.md` MUST be blocked at review.
 - **Commit hygiene**: Commits MUST reference the change scope (e.g., `fix:`, `feat:`,
   `docs:`). Co-author attribution for AI-assisted commits follows the Co-Authored-By
   convention.
@@ -137,4 +145,4 @@ the plan before implementation proceeds.
 
 Runtime development guidance: `CLAUDE.md` and `design.md` in the repository root.
 
-**Version**: 1.0.0 | **Ratified**: 2026-05-29 | **Last Amended**: 2026-05-29
+**Version**: 1.1.0 | **Ratified**: 2026-05-29 | **Last Amended**: 2026-06-02
