@@ -2,7 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import ProjectCard from './components/ProjectCard.jsx';
 import BurndownChart from './components/BurndownChart.jsx';
 import ThemeSelector from './components/ThemeSelector.jsx';
-import { fetchProjects, fetchBurndown, triggerSync } from './hooks/api.js';
+import DashboardToggle from './components/DashboardToggle.jsx';
+import AIDashboard from './components/ai/AIDashboard.jsx';
+import { fetchProjects, fetchBurndown, triggerSync, fetchAIStatus } from './hooks/api.js';
 import { useTheme } from './hooks/useTheme.js';
 
 const Stat = ({ label, value, color }) => (
@@ -17,13 +19,17 @@ const Stat = ({ label, value, color }) => (
 export default function App() {
   const { themeKey, setThemeKey, theme } = useTheme();
 
-  const [projects,   setProjects]   = useState([]);
-  const [selected,   setSelected]   = useState(null);
-  const [burndown,   setBurndown]   = useState(null);
-  const [loading,    setLoading]    = useState(true);
-  const [chartLoad,  setChartLoad]  = useState(false);
-  const [syncing,    setSyncing]    = useState(false);
-  const [error,      setError]      = useState(null);
+  const [projects,     setProjects]     = useState([]);
+  const [selected,     setSelected]     = useState(null);
+  const [burndown,     setBurndown]     = useState(null);
+  const [loading,      setLoading]      = useState(true);
+  const [chartLoad,    setChartLoad]    = useState(false);
+  const [syncing,      setSyncing]      = useState(false);
+  const [error,        setError]        = useState(null);
+  const [dashMode,     setDashMode]     = useState(
+    () => (localStorage.getItem('burndown_dashboard_mode') ?? 'legacy')
+  );
+  const [aiStatus,     setAIStatus]     = useState({ ollama: 'unavailable', cached: false });
 
   const loadProjects = useCallback(async () => {
     try {
@@ -38,6 +44,19 @@ export default function App() {
   }, []);
 
   useEffect(() => { loadProjects(); }, [loadProjects]);
+
+  // Poll AI status on mount and every 15 s (to detect Ollama coming online)
+  useEffect(() => {
+    const check = () => fetchAIStatus().then(setAIStatus).catch(() => {});
+    check();
+    const id = setInterval(check, 15_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const handleToggle = (mode) => {
+    setDashMode(mode);
+    localStorage.setItem('burndown_dashboard_mode', mode);
+  };
 
   useEffect(() => {
     if (!selected) return;
@@ -76,12 +95,17 @@ export default function App() {
         overflowY: 'auto',
       }}>
 
-        {/* Logo */}
+        {/* Logo + Toggle */}
         <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)' }}>
             Burndown
           </div>
-          <div style={{ fontSize: 11, color: 'var(--muted)' }}>via InvoiceNinja</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>via InvoiceNinja</div>
+          <DashboardToggle
+            mode={dashMode}
+            onToggle={handleToggle}
+            aiAvailable={aiStatus.ollama === 'ready' || aiStatus.ollama === 'pulling'}
+          />
         </div>
 
         {/* Sync button */}
@@ -120,6 +144,14 @@ export default function App() {
 
       {/* ── Main ── */}
       <main style={{ flex: 1, padding: '32px 36px', overflowY: 'auto' }}>
+
+        {/* AI Dashboard view */}
+        {dashMode === 'ai' && (
+          <AIDashboard theme={theme} ollamaStatus={aiStatus.ollama} />
+        )}
+
+        {/* Legacy Dashboard view */}
+        {dashMode !== 'ai' && (<>
 
         {error && (
           <div style={{ background: 'rgba(218,72,48,0.08)', border: '1px solid var(--danger)', borderRadius: 4, padding: '12px 16px', fontSize: 12, color: 'var(--danger)', marginBottom: 20 }}>
@@ -204,6 +236,7 @@ export default function App() {
             </div>
           </>
         )}
+        </>)} {/* end legacy view */}
       </main>
     </div>
   );

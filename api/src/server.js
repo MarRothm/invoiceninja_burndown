@@ -4,6 +4,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { projectRoutes } from './routes/projects.js';
+import { aiDashboardRoutes } from './routes/ai-dashboard.js';
 
 const fastify = Fastify({ logger: true });
 
@@ -43,6 +44,7 @@ fastify.setErrorHandler((err, req, reply) => {
 });
 
 await fastify.register(projectRoutes, { prefix: '/api' });
+await fastify.register(aiDashboardRoutes, { prefix: '/api' });
 
 try {
   await fastify.listen({ port: parseInt(process.env.PORT ?? '3000'), host: '0.0.0.0' });

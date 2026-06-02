@@ -18,3 +18,46 @@ export async function triggerSync() {
   if (!res.ok) throw new Error('Sync failed');
   return res.json();
 }
+
+export async function fetchAIStatus() {
+  const res = await fetch(`${BASE}/ai-dashboard/status`);
+  if (!res.ok) return { ollama: 'unavailable', model: 'qwen2.5:7b', cached: false };
+  return res.json();
+}
+
+export function fetchAIDashboard({ onToken, onCached, onDone, onError }) {
+  const source = new EventSource(`${BASE}/ai-dashboard`);
+
+  source.onmessage = (e) => {
+    const data = e.data;
+    if (data === '[DONE]') {
+      source.close();
+      onDone?.();
+      return;
+    }
+    // Cached payload: single JSON event with full layout
+    if (data.startsWith('{"cached":true')) {
+      try {
+        const { layout } = JSON.parse(data);
+        onCached?.(layout);
+      } catch { /* ignore */ }
+      return;
+    }
+    // Error payload
+    if (data.startsWith('{"error"')) {
+      try {
+        const parsed = JSON.parse(data);
+        onError?.(new Error(parsed.error));
+      } catch { /* ignore */ }
+      return;
+    }
+    onToken?.(data);
+  };
+
+  source.onerror = () => {
+    source.close();
+    onError?.(new Error('SSE connection failed'));
+  };
+
+  return () => source.close();
+}
