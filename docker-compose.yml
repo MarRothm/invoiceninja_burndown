@@ -45,13 +45,15 @@ services:
       retries:  5
 
   ollama:
-    image: ollama/ollama
+    build:
+      context: ./ollama
+      dockerfile: Dockerfile
+    image: burndown/ollama:latest
+    pull_policy: never
     container_name: burndown_ollama
     restart: unless-stopped
     volumes:
       - ollama_data:/root/.ollama
-      - ./ollama/entrypoint.sh:/entrypoint.sh:ro
-    entrypoint: ["/bin/sh", "/entrypoint.sh"]
     networks:
       - internal
     healthcheck:
