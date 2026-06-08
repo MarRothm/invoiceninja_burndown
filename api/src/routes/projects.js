@@ -1,5 +1,6 @@
 import { listProjectsWithStats, getBurndown } from '../services/burndown.js';
 import { runFullSync } from '../services/sync.js';
+import { invalidateAICache } from '../services/ai-dashboard.js';
 
 /**
  * Parse and validate a route :id param as a positive integer.
@@ -33,6 +34,7 @@ export async function projectRoutes(fastify) {
     config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
   }, async (req, reply) => {
     const result = await runFullSync();
+    invalidateAICache();
     return { ok: true, ...result };
   });
 

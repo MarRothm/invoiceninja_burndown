@@ -132,8 +132,19 @@ export default function AIDashboard({ theme, ollamaStatus }) {
   const isEmpty = isReady && !response.trim();
   if (status === 'ready' && isEmpty) {
     return (
-      <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)', fontSize: 14 }}>
-        No projects found. Sync InvoiceNinja data first.
+      <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)' }}>
+        <div style={{ fontSize: 14, marginBottom: 16 }}>
+          No layout generated. Sync InvoiceNinja data, then retry.
+        </div>
+        <button
+          onClick={load}
+          style={{
+            padding: '8px 16px', background: 'var(--accent)', color: '#fff',
+            border: 'none', borderRadius: 4, fontSize: 12, cursor: 'pointer',
+          }}
+        >
+          Retry
+        </button>
       </div>
     );
   }
