@@ -116,17 +116,21 @@ async function streamFromOllama(declarationContent, projects, onToken) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let accumulated = '';
+  let buffer = '';
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
 
-    const chunk = decoder.decode(value, { stream: true });
-    // Each chunk may contain multiple SSE lines from Ollama
-    for (const line of chunk.split('\n')) {
+    buffer += decoder.decode(value, { stream: true });
+    // Only process complete lines; keep the trailing partial line in buffer
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
       if (!line.startsWith('data: ')) continue;
       const data = line.slice(6).trim();
-      if (data === '[DONE]') break;
+      if (data === '[DONE]') return accumulated;
       try {
         const parsed = JSON.parse(data);
         const token = parsed.choices?.[0]?.delta?.content ?? '';
