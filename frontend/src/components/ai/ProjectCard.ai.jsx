@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { AIDashboardContext } from './AIDashboardContext.jsx';
 
-export default function ProjectCardAI({ projectId }) {
+export default function ProjectCardAI({ props: { projectId } }) {
   const { projects } = useContext(AIDashboardContext);
   const project = projects.find(p => String(p.id) === String(projectId));
 

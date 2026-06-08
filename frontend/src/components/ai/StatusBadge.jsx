@@ -6,7 +6,7 @@ const CONFIG = {
   'over-budget':{ label: 'Over Budget',  bg: 'rgba(218,72,48,0.12)',  color: '#da4830', border: '#da4830' },
 };
 
-export default function StatusBadge({ status }) {
+export default function StatusBadge({ props: { status } }) {
   const cfg = CONFIG[status] ?? CONFIG['on-budget'];
   return (
     <span style={{

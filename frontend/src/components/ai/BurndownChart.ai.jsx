@@ -3,7 +3,7 @@ import BurndownChart from '../BurndownChart.jsx';
 import { AIDashboardContext } from './AIDashboardContext.jsx';
 import { fetchBurndown } from '../../hooks/api.js';
 
-export default function BurndownChartAI({ projectId }) {
+export default function BurndownChartAI({ props: { projectId } }) {
   const { theme } = useContext(AIDashboardContext);
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
