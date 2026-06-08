@@ -9,7 +9,7 @@ SERVER_PID=$!
 
 # Wait until the API is accepting connections
 echo "[ollama] Waiting for server to be ready..."
-until curl -sf http://localhost:11434/api/tags > /dev/null 2>&1; do
+until ollama list > /dev/null 2>&1; do
   sleep 2
 done
 echo "[ollama] Server ready."
