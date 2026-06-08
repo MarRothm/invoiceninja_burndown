@@ -1,5 +1,5 @@
 import { defineComponent, createLibrary } from '@openuidev/react-lang';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 import ProjectCardAI from './ProjectCard.ai.jsx';
 import BurndownChartAI from './BurndownChart.ai.jsx';
 import StatusBadge from './StatusBadge.jsx';
