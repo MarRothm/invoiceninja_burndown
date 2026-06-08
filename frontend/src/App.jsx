@@ -30,6 +30,7 @@ export default function App() {
     () => (localStorage.getItem('burndown_dashboard_mode') ?? 'legacy')
   );
   const [aiStatus,     setAIStatus]     = useState({ ollama: 'unavailable', cached: false });
+  const [aiReloadKey,  setAiReloadKey]  = useState(0);
 
   const loadProjects = useCallback(async () => {
     try {
@@ -73,6 +74,7 @@ export default function App() {
     try {
       await triggerSync();
       await loadProjects();
+      setAiReloadKey(k => k + 1);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -147,7 +149,7 @@ export default function App() {
 
         {/* AI Dashboard view */}
         {dashMode === 'ai' && (
-          <AIDashboard theme={theme} ollamaStatus={aiStatus.ollama} />
+          <AIDashboard key={aiReloadKey} theme={theme} ollamaStatus={aiStatus.ollama} />
         )}
 
         {/* Legacy Dashboard view */}

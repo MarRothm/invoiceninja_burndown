@@ -14,6 +14,10 @@ export function isCached() {
   return cache !== null;
 }
 
+export function invalidateAICache() {
+  cache = null;
+}
+
 // ── Ollama health check ────────────────────────────────────────────────────
 
 export async function checkOllamaStatus() {
@@ -160,6 +164,8 @@ export async function generateOrCachedLayout(writeSSE) {
     writeSSE(token);
   });
 
-  // Store in cache under new hash (invalidates previous entry)
-  cache = { hash, layout: accumulated };
+  // Only cache non-empty layouts — an empty response means Ollama had nothing to render
+  if (accumulated.trim()) {
+    cache = { hash, layout: accumulated };
+  }
 }
