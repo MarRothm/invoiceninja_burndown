@@ -124,6 +124,21 @@ description: "Task list for OpenUI AI-Generated Dashboard (002-openui-ai-dashboa
 
 ---
 
+## Phase 8: Clarification 2026-06-09 — GitHub Actions CI/CD Pipeline (FR-013)
+
+**Goal**: Replace local Docker image builds with a GitHub Actions workflow that builds and pushes all custom service images to `ghcr.io` on every push to `master`, then calls the Portainer stack webhook to trigger an immediate redeploy. Local builds are preserved via a `docker-compose.dev.yml` overlay for developer validation.
+
+**Independent Test**: Push a commit to `master` → GitHub Actions workflow runs and all four image build jobs succeed → images appear in `ghcr.io/marrothm/` → Portainer webhook is called → Portainer redeploys the stack with the new image. Local: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build` starts the stack using locally built images.
+
+- [x] T041 Update `docker-compose.yml` — remove `build:` stanzas from `postgres`, `api`, `worker`, `frontend`, `ollama` services; change all `image:` values to `ghcr.io/marrothm/burndown-<service>:latest`; change `pull_policy: never` to `pull_policy: always`
+- [x] T042 [P] Create `docker-compose.dev.yml` — overlay file restoring `build:` context and `pull_policy: build` for `postgres` (`context: .`, `dockerfile: postgres/Dockerfile`), `ollama` (`context: ./ollama`), `api` (`context: ./api`), `worker` (`context: ./api`), and `frontend` (`context: ./frontend`) services
+- [x] T043 [P] Create `.github/workflows/build-and-push.yml` — GHA workflow triggered on `push` to `master`; authenticates to `ghcr.io` using `GHCR_TOKEN` secret; builds and pushes `burndown-postgres` (context `./postgres`), `burndown-ollama` (context `./ollama`), `burndown-api` (context `./api`), `burndown-frontend` (context `./frontend`) images tagged `latest`; final step: `curl -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}"` to trigger Portainer redeploy
+- [x] T044 [P] Update `README.md` — add CI/CD section documenting: required GitHub secrets (`GHCR_TOKEN` with `write:packages` scope, `PORTAINER_WEBHOOK_URL`), deployment flow (push to master → GHA → ghcr.io → Portainer webhook), and local dev instructions (`docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build`)
+
+**Checkpoint**: `docker-compose.yml` has no `build:` stanzas; `docker-compose.dev.yml` overlay restores local builds; GHA workflow pushes all 4 images and fires Portainer webhook on every master push
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -134,6 +149,8 @@ description: "Task list for OpenUI AI-Generated Dashboard (002-openui-ai-dashboa
 - **US2 AI Dashboard (Phase 4)**: Depends on Phase 2 completion; independent of US1 for implementation, needs US1 for end-to-end browser testing
 - **US3 Declarative Config (Phase 5)**: Depends on Phase 2 service layer (T006–T012); no dependency on US1/US2 frontend work
 - **Polish (Phase 6)**: All implementation phases complete
+- **FR-012 Filtering (Phase 7)**: Can be applied independently; no dependency on Phase 3–6
+- **CI/CD Pipeline (Phase 8)**: Independent of Phase 3–7 feature work; depends only on Phase 1 (docker-compose.yml exists); T042, T043, T044 are parallel; T041 can also run in parallel with T042–T044 (different files)
 
 ### User Story Dependencies
 
@@ -180,6 +197,7 @@ Task T024: "Register all four components in components.js"
 3. US2 → Full streaming dashboard: cards, charts, status badges
 4. US3 → Declaration-driven config + runtime updates via PUT endpoint
 5. Polish → Documentation and spec alignment complete
+6. CI/CD Pipeline (Phase 8) → GHA builds and pushes images; Portainer redeploys on every master push
 
 ---
 
@@ -191,3 +209,4 @@ Task T024: "Register all four components in components.js"
 - StatusBadge thresholds are **not** hardcoded — they come from the declaration via `GET /api/ai-dashboard/config` (FR-009)
 - Declaration default is baked into the Docker image; runtime override via `api_data` volume + `PUT /api/ai-dashboard/declaration` (FR-005 / SC-004)
 - Projects are pre-sorted server-side by `progress` descending before being sent to Ollama — the model cannot be relied upon to sort correctly
+- Phase 8 CI/CD: `docker-compose.yml` has no `build:` stanzas (Portainer uses pre-built ghcr.io images); local dev uses `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build`; GitHub secrets `GHCR_TOKEN` and `PORTAINER_WEBHOOK_URL` must be configured in the repository settings before T043 can be exercised

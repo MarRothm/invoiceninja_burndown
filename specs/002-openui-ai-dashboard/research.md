@@ -145,6 +145,45 @@ exposed to browsers as a static asset.
 
 ---
 
+## Decision 7: GitHub Actions CI/CD — Image Build, Registry, and Portainer Redeploy
+
+**Decision**: All custom service images are built and pushed exclusively via a GitHub Actions
+workflow (`.github/workflows/build-and-push.yml`) triggered on push to `master`. Images are
+published to GitHub Container Registry (`ghcr.io/marrothm/<image>:latest`). After a
+successful push, the workflow calls the Portainer stack webhook URL to trigger an immediate
+redeploy — Portainer then pulls the updated image.
+
+Custom images built by GHA: `burndown-postgres`, `burndown-ollama`, `burndown-api`,
+`burndown-frontend`. The `worker` service reuses the `burndown-api` image. The `redis`
+service uses the official `redis:7-alpine` upstream image (unchanged).
+
+The production `docker-compose.yml` (deployed via Portainer) references `ghcr.io` image
+names with `pull_policy: always` and no `build:` stanzas. A separate `docker-compose.dev.yml`
+overlay restores `build:` contexts for local developer validation (`docker compose -f
+docker-compose.yml -f docker-compose.dev.yml up --build`).
+
+Required GitHub repository secrets: `GHCR_TOKEN` (Personal Access Token with
+`write:packages` scope for ghcr.io push auth) and `PORTAINER_WEBHOOK_URL` (the Portainer
+stack webhook URL for redeploy trigger).
+
+**Rationale**: Portainer cannot reliably trigger local Docker builds on file changes
+(volume-mounted source code is not part of the container lifecycle). Pre-built images
+pushed to a registry eliminate this failure mode — Portainer's webhook pull is the
+authoritative deployment event. GHCR is free for all GitHub repos, uses the same
+GitHub PAT for authentication, and requires no separate account. The `pull_policy: always`
+ensures Portainer always fetches the latest image rather than using a cached layer.
+
+**Alternatives considered**:
+- Docker Hub: pull rate limits for anonymous and free-tier accounts; separate credentials
+  to manage; no advantage over GHCR for a GitHub-hosted repo.
+- Self-hosted registry: adds infrastructure to maintain; no benefit at this scale.
+- Portainer polling (auto-pull on interval): has lag; no clear audit trail in GHA logs;
+  webhook is immediate and event-driven.
+- Manual Portainer redeploy: requires operator action for every push; defeats CI/CD goal.
+- Keep local builds: the root cause of the Portainer rebuild problem — removed.
+
+---
+
 ## Summary of Resolved Unknowns
 
 | Unknown | Resolution |
@@ -155,3 +194,4 @@ exposed to browsers as a static asset.
 | Ollama model auto-pull | Custom `entrypoint.sh` + named volume for persistence |
 | XSS / component sandboxing | openUI component registry; arbitrary tags silently ignored |
 | Declaration file location | `api/dashboard.declaration.md` baked into image; runtime override via `api_data` volume + `PUT /api/ai-dashboard/declaration` |
+| Image build & deployment pipeline | GitHub Actions → ghcr.io push → Portainer webhook; no local builds in production path |

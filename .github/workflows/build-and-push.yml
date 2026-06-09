@@ -1,0 +1,59 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push burndown-postgres
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: postgres/Dockerfile
+          push: true
+          tags: ghcr.io/marrothm/burndown-postgres:latest
+
+      - name: Build and push burndown-ollama
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ollama
+          file: ollama/Dockerfile
+          push: true
+          tags: ghcr.io/marrothm/burndown-ollama:latest
+
+      - name: Build and push burndown-api
+        uses: docker/build-push-action@v5
+        with:
+          context: ./api
+          file: api/Dockerfile
+          push: true
+          tags: ghcr.io/marrothm/burndown-api:latest
+
+      - name: Build and push burndown-frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: frontend/Dockerfile
+          push: true
+          tags: ghcr.io/marrothm/burndown-frontend:latest
+
+      - name: Trigger Portainer redeploy
+        run: curl -f -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}"

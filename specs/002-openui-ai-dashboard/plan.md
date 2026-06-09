@@ -45,9 +45,22 @@ new API route + new frontend view alongside unchanged legacy view
   (Principle III: Layered Service Architecture)
 - Only Dashboard, ProjectCard, BurndownChart, StatusBadge components may be rendered (FR-004)
 - qwen2.5:7b requires ~8 GB RAM headroom on the host
+- Local image builds (`docker build`) are NOT the deployment path — GHA builds and publishes
+  all custom images (FR-013); `docker compose up --build` is for local dev/validation only
+
+**CI/CD Pipeline**:
+- Workflow file: `.github/workflows/build-and-push.yml`
+- Trigger: push to `master` branch
+- Builds: `burndown-postgres`, `burndown-ollama`, `burndown-api`, `burndown-frontend`
+  (worker reuses the api image; redis uses the official upstream image — not rebuilt)
+- Registry: `ghcr.io/marrothm/<image>:latest`
+- Post-push: calls `PORTAINER_WEBHOOK_URL` secret to trigger immediate Portainer stack redeploy
+- Required GitHub secrets: `GHCR_TOKEN` (registry push auth), `PORTAINER_WEBHOOK_URL`
+- `docker-compose.yml` for Portainer: references `ghcr.io/marrothm/` images with `pull_policy: always`; no `build:` stanzas
+- `docker-compose.dev.yml` (overlay): restores `build:` contexts for local developer validation
 
 **Scale/Scope**: One new Docker service, one new API route, one new frontend view,
-one declaration file. Existing services, database schema, and legacy dashboard untouched.
+one declaration file, one GHA workflow. Existing services, database schema, and legacy dashboard untouched.
 
 ## Constitution Check
 
@@ -58,8 +71,8 @@ one declaration file. Existing services, database schema, and legacy dashboard u
 | I. Self-Hosted & Network-Boundary Security | ✅ Pass | Ollama on internal network; no external AI calls; openUI component restriction prevents arbitrary HTML injection |
 | II. InvoiceNinja Is the Single Source of Truth | ✅ Pass | AI reads project data from existing API endpoints; no new data store; no InvoiceNinja API changes |
 | III. Layered Service Architecture | ✅ Pass | Frontend → Fastify API → Ollama (no layer bypass); new `ollama` service has single responsibility |
-| IV. Security Hygiene | ✅ Pass | openUI restricts output to registered components (no XSS vector); Ollama isolated on internal network; no new prod deps with known CVEs |
-| V. Simplicity & Observable Configuration | ✅ Pass | YAGNI — all additions required by spec; InvoiceNinja design tokens applied to StatusBadge and AI dashboard chrome |
+| IV. Security Hygiene | ✅ Pass | openUI restricts output to registered components (no XSS vector); Ollama isolated on internal network; no new prod deps with known CVEs; GHA secrets (`GHCR_TOKEN`, `PORTAINER_WEBHOOK_URL`) kept in GitHub repo secrets — never in source |
+| V. Simplicity & Observable Configuration | ✅ Pass | YAGNI — all additions required by spec; InvoiceNinja design tokens applied to StatusBadge and AI dashboard chrome; Docker Compose remains canonical local method (dev overlay); GHA is the production deployment transport (no constitution conflict — see Complexity Tracking) |
 
 ## Project Structure
 
@@ -80,7 +93,12 @@ specs/002-openui-ai-dashboard/
 ```text
 api/dashboard.declaration.md                  # New: plain-language prose dashboard config (baked into image; runtime override via api_data volume)
 
-docker-compose.yml                            # Updated: add ollama service + ollama_data volume
+.github/
+└── workflows/
+    └── build-and-push.yml                    # New: build & push all custom images to ghcr.io on push to master; call Portainer webhook
+
+docker-compose.yml                            # Updated: add ollama service + ollama_data volume; reference ghcr.io images; pull_policy: always (no build stanzas)
+docker-compose.dev.yml                        # New: local dev overlay — restores build: contexts for docker compose -f ... --build
 ollama/
 └── entrypoint.sh                             # New: auto-pull qwen2.5:7b on first start
 
@@ -123,4 +141,11 @@ The legacy dashboard path is fully preserved; all AI-dashboard files are isolate
 
 ## Complexity Tracking
 
-> No constitution violations to justify.
+**FR-013 — GHA CI/CD / split compose files**: The constitution's Development Workflow
+requires "Docker-first validation via `docker compose up -d --build`" for local validation
+and also states "Docker Compose MUST be the canonical local deployment method." These remain
+satisfied: the `docker-compose.dev.yml` overlay preserves local build capability for
+developer validation. The production `docker-compose.yml` (used by Portainer) references
+pre-built `ghcr.io` images — this is a deployment transport change, not a contradiction of
+the local-first principle. The split compose approach is the standard pattern for this exact
+workflow and requires no constitution amendment.

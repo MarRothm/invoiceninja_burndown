@@ -17,13 +17,23 @@ Includes an optional AI-generated dashboard powered by a local Ollama model.
 
 ## Quick Start
 
+### Portainer deployment (production)
+
+Images are built automatically by GitHub Actions on every push to `master` and published
+to `ghcr.io`. Deploy the stack in Portainer using `docker-compose.yml` — images are pulled
+from the registry; no local build is required.
+
+On first start, Ollama pulls `qwen2.5:7b` (~5 GB). Subsequent starts are instant.
+
+### Local development
+
 ```bash
 # 1. Create env file
 cp .env.example .env
 # → fill .env with your values (see below)
 
-# 2. Start stack
-docker compose up -d --build
+# 2. Build and start from local source (uses docker-compose.dev.yml overlay)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 # → first run: Ollama pulls qwen2.5:7b (~5 GB); subsequent starts are instant
 
 # 3. Open browser
@@ -115,7 +125,7 @@ followed by a BurndownChart below it.
 Status thresholds: at-risk >= 80%, over-budget > 100%.
 ```
 
-After saving the file, rebuild and redeploy the stack — the declaration is baked into the image.
+After saving the file, commit and push to `master` — GitHub Actions rebuilds the `burndown-api` image and triggers the Portainer webhook automatically.
 
 To update the declaration **without** rebuilding, use the API:
 
@@ -155,6 +165,44 @@ OLLAMA_URL=http://host-gateway:11434
 ```
 
 Then remove the `ollama` service from `docker-compose.yml`.
+
+## CI/CD
+
+Docker images are built and published automatically via GitHub Actions on every push to `master`.
+
+### GitHub Secrets required
+
+| Secret | Description |
+|--------|-------------|
+| `PORTAINER_WEBHOOK_URL` | Portainer stack webhook URL — called after every successful image push to trigger immediate redeploy |
+
+> **Note**: Registry authentication uses the built-in `GITHUB_TOKEN` (no manual secret needed). Ensure the workflow has `packages: write` permission — this is already set in `.github/workflows/build-and-push.yml`.
+
+### Images published
+
+| Image | Registry |
+|-------|----------|
+| `burndown-postgres` | `ghcr.io/marrothm/burndown-postgres:latest` |
+| `burndown-ollama` | `ghcr.io/marrothm/burndown-ollama:latest` |
+| `burndown-api` | `ghcr.io/marrothm/burndown-api:latest` |
+| `burndown-frontend` | `ghcr.io/marrothm/burndown-frontend:latest` |
+
+The `worker` service reuses the `burndown-api` image (same binary, different entry point command). Redis uses the official `redis:7-alpine` upstream image and is not rebuilt by this pipeline.
+
+### Deployment flow
+
+```
+git push origin master
+       │
+       ▼
+GitHub Actions builds 4 images → pushes to ghcr.io
+       │
+       ▼
+POST $PORTAINER_WEBHOOK_URL
+       │
+       ▼
+Portainer pulls new images → redeploys stack
+```
 
 ## Burndown Logic
 

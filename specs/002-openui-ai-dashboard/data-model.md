@@ -88,6 +88,43 @@ root   = Dashboard([card1, chart1])
 
 ---
 
+## CI/CD Pipeline (GitHub Actions)
+
+**Workflow**: `.github/workflows/build-and-push.yml`
+**Trigger**: push to `master`
+
+### Image Registry
+
+| Service | Image Name | Tag | Build Context |
+|---------|-----------|-----|---------------|
+| postgres | `ghcr.io/marrothm/burndown-postgres` | `latest` | `./postgres` |
+| ollama | `ghcr.io/marrothm/burndown-ollama` | `latest` | `./ollama` |
+| api | `ghcr.io/marrothm/burndown-api` | `latest` | `./api` |
+| worker | reuses `burndown-api` | — | — |
+| frontend | `ghcr.io/marrothm/burndown-frontend` | `latest` | `./frontend` |
+| redis | `redis:7-alpine` (upstream) | — | not rebuilt |
+
+### Required GitHub Secrets
+
+| Secret | Purpose |
+|--------|---------|
+| `GHCR_TOKEN` | Personal Access Token (`write:packages`) for `ghcr.io` push authentication |
+| `PORTAINER_WEBHOOK_URL` | Portainer stack webhook URL; called after successful image push to trigger immediate redeploy |
+
+### docker-compose.yml (Portainer / production)
+
+- All custom `image:` values reference `ghcr.io/marrothm/burndown-<service>:latest`
+- `pull_policy: always` — Portainer always fetches the latest pushed image
+- No `build:` stanzas — Portainer has no source code context; images are pre-built
+
+### docker-compose.dev.yml (local development overlay)
+
+- Adds `build:` contexts and overrides `pull_policy: build` for each custom service
+- Used by developers: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build`
+- Portainer never reads this file
+
+---
+
 ## Docker Service: Ollama
 
 | Property | Value |
