@@ -13,6 +13,8 @@ export default function AIDashboard({ theme, ollamaStatus }) {
   const [errorMsg, setErrorMsg]   = useState('');
   const [projects, setProjects]     = useState([]);
   const [thresholds, setThresholds] = useState({ atRisk: 80, overBudget: 100 });
+  // Incremented when streaming ends so Renderer remounts and re-parses the full response
+  const [renderKey, setRenderKey]   = useState(0);
   const closeRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -24,6 +26,7 @@ export default function AIDashboard({ theme, ollamaStatus }) {
     setStatus('loading');
     setStreaming(false);
     setErrorMsg('');
+    setRenderKey(0);
 
     timerRef.current = setTimeout(() => {
       if (closeRef.current) closeRef.current();
@@ -54,6 +57,9 @@ export default function AIDashboard({ theme, ollamaStatus }) {
         clearTimeout(timerRef.current);
         setStatus(prev => prev === 'error' ? prev : 'ready');
         setStreaming(false);
+        // Force Renderer to remount with the complete accumulated response so all
+        // components are visible without a manual reload (FR-003)
+        setRenderKey(k => k + 1);
       },
       onError: (err) => {
         clearTimeout(timerRef.current);
@@ -163,6 +169,7 @@ export default function AIDashboard({ theme, ollamaStatus }) {
         )}
         {response && (
           <Renderer
+            key={renderKey}
             response={response}
             library={library}
             isStreaming={streaming}
