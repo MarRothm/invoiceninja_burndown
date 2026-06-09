@@ -65,8 +65,8 @@ services:
 
   api:
     build:
-      context:    .
-      dockerfile: api/Dockerfile
+      context:    ./api
+      dockerfile: Dockerfile
     image: burndown/api:latest
     pull_policy: never
     container_name: burndown_api
@@ -81,7 +81,7 @@ services:
       CORS_ORIGIN:           ${PUBLIC_URL:-*}
       OLLAMA_URL:            http://ollama:11434
     volumes:
-      - ./dashboard.declaration.md:/app/dashboard.declaration.md:ro
+      - ./api/dashboard.declaration.md:/app/dashboard.declaration.md:ro
     depends_on:
       postgres:
         condition: service_healthy
