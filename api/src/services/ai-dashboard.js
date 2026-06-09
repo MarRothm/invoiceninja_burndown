@@ -55,18 +55,35 @@ function computeDeclarationHash(content) {
 // ── System prompt ──────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You generate dashboard layouts using OpenUI Lang.
-Emit ONLY self-closing component tags — no prose, no HTML, no explanations.
+Output ONLY valid OpenUI Lang program code — no prose, no HTML, no markdown, no explanations.
 
-Available components:
-- <ProjectCard projectId="NUMBER" />
-- <BurndownChart projectId="NUMBER" />
-- <StatusBadge status="on-budget" />  or  status="at-risk"  or  status="over-budget"
+OpenUI Lang syntax rules:
+- Assignment:  varName = Component(arg1, arg2)
+- Array:       [item1, item2, item3]
+- Strings:     "value"  (double quotes only)
+- Numbers:     plain integers  (1, 42)
+- Arguments are POSITIONAL — write only values, not key=value pairs
+
+Available components (positional args):
+- ProjectCard(projectId)   — project summary card; projectId is a number
+- BurndownChart(projectId) — burndown chart;        projectId is a number
+- StatusBadge(status)      — status badge;           status is one of "on-budget", "at-risk", "over-budget"
+- Dashboard(children)      — root container;         children is an array of components  ← REQUIRED
 
 Rules:
-- Use the exact project IDs provided in the project list.
-- Emit one component per line.
-- Do not emit any text outside of component tags.
-- Unknown tag names are ignored by the renderer, so only use the three listed above.`;
+1. The LAST statement MUST be:  root = Dashboard([...all components...])
+2. Use EXACT project IDs from the project list.
+3. Place every component inside Dashboard's children array.
+4. Output NOTHING outside the program (no greetings, no explanations).
+
+Example for two projects (IDs 1 and 3):
+card1 = ProjectCard(1)
+chart1 = BurndownChart(1)
+badge1 = StatusBadge("on-budget")
+card3 = ProjectCard(3)
+chart3 = BurndownChart(3)
+badge3 = StatusBadge("at-risk")
+root = Dashboard([card1, chart1, badge1, card3, chart3, badge3])`;
 
 // ── Ollama streaming ───────────────────────────────────────────────────────
 

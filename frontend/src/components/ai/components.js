@@ -1,8 +1,18 @@
 import { defineComponent, createLibrary } from '@openuidev/react-lang';
 import { z } from 'zod/v4';
+import DashboardRoot from './Dashboard.ai.jsx';
 import ProjectCardAI from './ProjectCard.ai.jsx';
 import BurndownChartAI from './BurndownChart.ai.jsx';
 import StatusBadge from './StatusBadge.jsx';
+
+const DashboardDef = defineComponent({
+  name: 'Dashboard',
+  description: 'Root layout container — renders all child components in a vertical column.',
+  props: z.object({
+    children: z.array(z.any()).optional().describe('Child components to render'),
+  }),
+  component: DashboardRoot,
+});
 
 const ProjectCardDef = defineComponent({
   name: 'ProjectCard',
@@ -32,5 +42,6 @@ const StatusBadgeDef = defineComponent({
 });
 
 export const library = createLibrary({
-  components: [ProjectCardDef, BurndownChartDef, StatusBadgeDef],
+  root: 'Dashboard',
+  components: [DashboardDef, ProjectCardDef, BurndownChartDef, StatusBadgeDef],
 });
