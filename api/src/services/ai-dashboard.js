@@ -173,3 +173,67 @@ export async function generateOrCachedLayout(writeSSE) {
     cache = { hash, layout: accumulated };
   }
 }
+
+// ── Debug diagnostic (non-streaming) ──────────────────────────────────────
+
+export async function debugInfo() {
+  const result = {
+    ollamaUrl:  ollamaBaseUrl,
+    model,
+    declarationPath,
+    ollamaStatus: null,
+    declarationFound: false,
+    declarationLength: 0,
+    projectCount: 0,
+    ollamaHttpStatus: null,
+    ollamaRawResponse: null,
+    ollamaError: null,
+    parsedTokens: [],
+  };
+
+  // Ollama status
+  result.ollamaStatus = await checkOllamaStatus();
+
+  // Declaration file
+  try {
+    const decl = await readFile(declarationPath, 'utf8');
+    result.declarationFound = true;
+    result.declarationLength = decl.length;
+  } catch {
+    result.declarationFound = false;
+  }
+
+  // Projects
+  try {
+    const projects = await listProjectsWithStats();
+    result.projectCount = projects.length;
+    result.projectIds = projects.map(p => ({ id: p.id, name: p.name }));
+  } catch (e) {
+    result.projectsError = e.message;
+  }
+
+  // Non-streaming Ollama request with a minimal prompt
+  try {
+    const res = await fetch(`${ollamaBaseUrl}/v1/chat/completions`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: 'Reply with exactly: <ProjectCard projectId="1" />' },
+          { role: 'user',   content: 'Generate.' },
+        ],
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    result.ollamaHttpStatus = res.status;
+    const body = await res.json();
+    result.ollamaRawResponse = body;
+    result.parsedContent = body?.choices?.[0]?.message?.content ?? null;
+  } catch (e) {
+    result.ollamaError = e.message;
+  }
+
+  return result;
+}

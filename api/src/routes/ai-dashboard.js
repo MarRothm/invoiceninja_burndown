@@ -1,4 +1,4 @@
-import { checkOllamaStatus, generateOrCachedLayout, isCached } from '../services/ai-dashboard.js';
+import { checkOllamaStatus, generateOrCachedLayout, isCached, debugInfo } from '../services/ai-dashboard.js';
 
 export async function aiDashboardRoutes(fastify) {
   // GET /ai-dashboard/status — AI service health check for toggle enablement
@@ -9,6 +9,11 @@ export async function aiDashboardRoutes(fastify) {
       model: process.env.OLLAMA_MODEL ?? 'qwen2.5:7b',
       cached: isCached(),
     };
+  });
+
+  // GET /ai-dashboard/debug — full diagnostic (non-streaming)
+  fastify.get('/ai-dashboard/debug', async (req, reply) => {
+    return debugInfo();
   });
 
   // GET /ai-dashboard — SSE stream of openUI Lang layout tokens
