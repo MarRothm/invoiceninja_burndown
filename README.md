@@ -58,7 +58,7 @@ InvoiceNinja API
       ▼
   API (Fastify)  ←──────────────  Ollama (qwen2.5:7b)
       │                                   ▲
-      ▼                           dashboard.declaration.md
+      ▼                           api/dashboard.declaration.md
   Frontend (React + Recharts)
       │
       ▼
@@ -85,6 +85,9 @@ GET  /api/projects/:id/burndown     → Burndown data for a project
 POST /api/sync                      → Trigger manual sync
 GET  /api/ai-dashboard              → AI-generated dashboard layout (SSE stream)
 GET  /api/ai-dashboard/status       → Ollama availability + model status
+GET  /api/ai-dashboard/config       → Parsed thresholds from declaration (used by frontend)
+PUT  /api/ai-dashboard/declaration  → Update declaration at runtime (body: { content: "…" })
+GET  /api/ai-dashboard/debug        → Full AI diagnostic (Ollama status, declaration, projects)
 ```
 
 ## AI Dashboard
@@ -100,26 +103,46 @@ The toggle is disabled when Ollama is unavailable or the model is still being pu
 
 ### Customising the Layout
 
-Edit `dashboard.declaration.md` at the repository root — plain prose, no code:
+Edit `api/dashboard.declaration.md` — plain prose, no code:
 
 ```
-Show all active projects ordered by budget consumed (highest first).
-For each project, show a ProjectCard with name, budgeted hours, hours used, and remaining hours.
-Add a StatusBadge: over-budget for >100%, at-risk for 80–100%, on-budget otherwise.
-Below each card, show a BurndownChart.
+Show all in_progress projects ordered by budget consumed (highest progress percentage first).
+Include every project with status "in_progress", even those with 0 hours logged.
+
+For each project show a ProjectCard (which includes a built-in status badge and progress bar)
+followed by a BurndownChart below it.
+
+Status thresholds: at-risk >= 80%, over-budget > 100%.
 ```
 
-After saving, reload the AI dashboard — the layout updates automatically (no rebuild needed).
+After saving the file, rebuild and redeploy the stack — the declaration is baked into the image.
+
+To update the declaration **without** rebuilding, use the API:
+
+```bash
+curl -X PUT http://localhost:3000/api/ai-dashboard/declaration \
+  -H 'Content-Type: application/json' \
+  -d '{"content": "Show all in_progress projects ordered by budget consumed..."}'
+```
+
+The new content is persisted to a Docker volume and takes effect on the next dashboard load (cache is invalidated automatically).
 
 ### Available Components
 
-The AI model composes layouts using three registered components:
+The AI model composes layouts using openUI Lang function-call syntax:
 
-| Component | Props | Displays |
-|-----------|-------|---------|
-| `<ProjectCard projectId="N" />` | project ID | Name, budget, hours logged, hours remaining |
-| `<BurndownChart projectId="N" />` | project ID | Ideal vs. actual burndown line chart |
-| `<StatusBadge status="…" />` | `on-budget` / `at-risk` / `over-budget` | Colour-coded budget health badge |
+```
+card1  = ProjectCard(1)
+chart1 = BurndownChart(1)
+root   = Dashboard([card1, chart1])
+```
+
+| Component | Argument | Displays |
+|-----------|----------|---------|
+| `Dashboard(children)` | array of components | Root container — every layout must end with `root = Dashboard([...])` |
+| `ProjectCard(projectId)` | project ID (number) | Name, budget, hours logged, remaining, status badge (threshold-driven) |
+| `BurndownChart(projectId)` | project ID (number) | Ideal vs. actual burndown line chart |
+| `StatusBadge` | — | Embedded inside ProjectCard; thresholds set by declaration |
 
 ### Sharing Ollama with Other Projects
 

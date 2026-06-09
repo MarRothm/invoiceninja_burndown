@@ -3,16 +3,17 @@ import { AIDashboardContext } from './AIDashboardContext.jsx';
 import StatusBadge from './StatusBadge.jsx';
 
 export default function ProjectCardAI({ props: { projectId } }) {
-  const { projects } = useContext(AIDashboardContext);
+  const { projects, thresholds } = useContext(AIDashboardContext);
   const project = projects.find(p => String(p.id) === String(projectId));
 
   if (!project) return null;
 
   const { name, budgeted_hours, total_logged, progress } = project;
   const remaining = Math.max(0, budgeted_hours - total_logged);
-  const isOver    = progress > 100;
-  const color     = isOver ? '#da4830' : '#117cc1';
-  const status    = progress > 100 ? 'over-budget' : progress >= 80 ? 'at-risk' : 'on-budget';
+  const { atRisk = 80, overBudget = 100 } = thresholds ?? {};
+  const isOver = progress > overBudget;
+  const color  = isOver ? '#da4830' : '#117cc1';
+  const status = progress > overBudget ? 'over-budget' : progress >= atRisk ? 'at-risk' : 'on-budget';
 
   return (
     <div style={{

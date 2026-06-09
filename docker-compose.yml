@@ -80,6 +80,8 @@ services:
       INVOICENINJA_API_KEY:  ${INVOICENINJA_API_KEY}
       CORS_ORIGIN:           ${PUBLIC_URL:-*}
       OLLAMA_URL:            http://ollama:11434
+    volumes:
+      - api_data:/app/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -135,6 +137,7 @@ volumes:
   postgres_data:
   redis_data:
   ollama_data:
+  api_data:
 
 networks:
   internal:

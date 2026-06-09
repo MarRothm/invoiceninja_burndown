@@ -8,20 +8,22 @@
 
 Add a locally-hosted AI-generated dashboard alongside the existing React dashboard.
 The operator writes a plain-language prose declaration file; an Ollama container running
-`qwen2.5:7b` generates the dashboard layout using openUI Lang, composing it from three
-registered React components (ProjectCard, BurndownChart, StatusBadge). A toggle in the
-navigation switches between the legacy and AI-generated views. The AI response is cached
-in memory and invalidated only when the declaration file changes.
+`qwen2.5:7b` generates the dashboard layout using openUI Lang, composing it from four
+registered React components (Dashboard, ProjectCard, BurndownChart, StatusBadge). A
+toggle in the navigation switches between the legacy and AI-generated views. The AI
+response is cached in memory and invalidated only when the declaration file changes.
+The declaration is updateable at runtime via `PUT /api/ai-dashboard/declaration`
+(persisted to a named Docker volume; no image rebuild required).
 
 ## Technical Context
 
 **Language/Version**: JavaScript (ESM) — Node.js 22 (API), React 18 (frontend)
 
 **Primary Dependencies**:
-- `@openuidev/react-lang` — openUI Lang parser, renderer, system-prompt generator (frontend)
-- `@openuidev/react-headless` — streaming chat state management (frontend)
+- `@openuidev/react-lang` — openUI Lang parser and renderer (frontend)
 - `ollama/ollama` Docker image — local LLM runtime (new container)
 - `qwen2.5:7b` — AI model pulled automatically on first Ollama startup
+- Native `EventSource` — SSE streaming (no extra npm package needed)
 
 **Storage**: In-memory Map (ephemeral, API process lifetime) for layout cache; no DB changes
 
@@ -41,7 +43,7 @@ new API route + new frontend view alongside unchanged legacy view
 - No external AI API calls — Ollama runs on the internal Docker network only
 - Frontend MUST NOT call Ollama directly — all AI requests go through Fastify API
   (Principle III: Layered Service Architecture)
-- Only ProjectCard, BurndownChart, StatusBadge components may be rendered (FR-004)
+- Only Dashboard, ProjectCard, BurndownChart, StatusBadge components may be rendered (FR-004)
 - qwen2.5:7b requires ~8 GB RAM headroom on the host
 
 **Scale/Scope**: One new Docker service, one new API route, one new frontend view,
@@ -76,7 +78,7 @@ specs/002-openui-ai-dashboard/
 ### Source Code (repository root)
 
 ```text
-dashboard.declaration.md                      # New: plain-language prose dashboard config
+api/dashboard.declaration.md                  # New: plain-language prose dashboard config (baked into image; runtime override via api_data volume)
 
 docker-compose.yml                            # Updated: add ollama service + ollama_data volume
 ollama/
@@ -104,14 +106,15 @@ frontend/
 │   │   ├── DashboardToggle.jsx               # New: toggle button (legacy ↔ AI)
 │   │   └── ai/
 │   │       ├── AIDashboard.jsx               # New: AI dashboard root; streaming + cache display
-│   │       ├── AIDashboardContext.jsx        # New: React context providing projects + theme to AI components
-│   │       ├── components.js                 # New: openUI component registry + system prompt
-│   │       ├── ProjectCard.ai.jsx            # New: openUI-registered ProjectCard variant
+│   │       ├── AIDashboardContext.jsx        # New: React context providing projects, theme, thresholds
+│   │       ├── components.js                 # New: openUI component registry (root: Dashboard)
+│   │       ├── Dashboard.ai.jsx              # New: openUI root container (required by openUI Lang)
+│   │       ├── ProjectCard.ai.jsx            # New: openUI-registered ProjectCard (embeds StatusBadge)
 │   │       ├── BurndownChart.ai.jsx          # New: openUI-registered BurndownChart variant
 │   │       └── StatusBadge.jsx               # New: on-budget / at-risk / over-budget indicator
 │   └── hooks/
-│       └── api.js                            # Updated: add fetchAIDashboard() streaming helper
-└── package.json                              # Updated: @openuidev/react-lang, @openuidev/react-headless
+│       └── api.js                            # Updated: add fetchAIDashboard(), fetchAIDashboardConfig()
+└── package.json                              # Updated: @openuidev/react-lang
 ```
 
 **Structure Decision**: Web application additive enhancement. No existing files are deleted.

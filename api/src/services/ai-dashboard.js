@@ -1,11 +1,15 @@
 import { createHash } from 'crypto';
-import { readFile } from 'fs/promises';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import { resolve } from 'path';
 import { listProjectsWithStats } from './burndown.js';
 
 const ollamaBaseUrl = process.env.OLLAMA_URL ?? 'http://ollama:11434';
 const model         = process.env.OLLAMA_MODEL ?? 'qwen2.5:7b';
+// Baked-in default (COPY in Dockerfile)
 const declarationPath = resolve(process.cwd(), 'dashboard.declaration.md');
+// Runtime override — written here by PUT /api/ai-dashboard/declaration
+const DATA_DIR = process.env.DECLARATION_DATA_DIR ?? '/app/data';
+const declarationDataPath = resolve(DATA_DIR, 'dashboard.declaration.md');
 
 // Ephemeral in-memory cache: { hash: string, layout: string } | null
 let cache = null;
@@ -40,15 +44,37 @@ const DEFAULT_DECLARATION = `Show all projects with their burndown charts and cu
 For each project display a ProjectCard, a BurndownChart, and a StatusBadge.`;
 
 async function readDeclaration() {
-  try {
-    return await readFile(declarationPath, 'utf8');
-  } catch {
-    return DEFAULT_DECLARATION;
-  }
+  // Runtime override takes priority (volume-mounted, operator-editable without rebuild)
+  try { return await readFile(declarationDataPath, 'utf8'); } catch { /* no override */ }
+  // Fall back to baked-in default
+  try { return await readFile(declarationPath, 'utf8'); } catch { /* no file */ }
+  return DEFAULT_DECLARATION;
 }
 
 function computeDeclarationHash(content) {
   return createHash('sha256').update(content).digest('hex');
+}
+
+// Parses operator-defined percentage thresholds from plain-prose declaration.
+// Looks for numbers near "at-risk" / "over-budget" keywords; falls back to 80/100.
+function parseThresholds(declaration) {
+  const atRiskMatch     = declaration.match(/at[-\s]?risk[^.]*?(\d+)\s*%/i);
+  const overBudgetMatch = declaration.match(/over[-\s]?budget[^.]*?(\d+)\s*%/i);
+  return {
+    atRisk:     atRiskMatch     ? parseInt(atRiskMatch[1],     10) : 80,
+    overBudget: overBudgetMatch ? parseInt(overBudgetMatch[1], 10) : 100,
+  };
+}
+
+export async function getThresholds() {
+  const declaration = await readDeclaration();
+  return parseThresholds(declaration);
+}
+
+export async function updateDeclaration(content) {
+  await mkdir(DATA_DIR, { recursive: true });
+  await writeFile(declarationDataPath, content, 'utf8');
+  invalidateAICache();
 }
 
 // ── System prompt ──────────────────────────────────────────────────────────

@@ -25,6 +25,16 @@ export async function fetchAIStatus() {
   return res.json();
 }
 
+export async function fetchAIDashboardConfig() {
+  try {
+    const res = await fetch(`${BASE}/ai-dashboard/config`);
+    if (!res.ok) return { thresholds: { atRisk: 80, overBudget: 100 } };
+    return res.json();
+  } catch {
+    return { thresholds: { atRisk: 80, overBudget: 100 } };
+  }
+}
+
 export function fetchAIDashboard({ onToken, onCached, onDone, onError }) {
   const source = new EventSource(`${BASE}/ai-dashboard`);
 

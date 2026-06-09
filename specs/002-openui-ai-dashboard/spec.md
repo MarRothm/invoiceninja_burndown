@@ -131,8 +131,8 @@ new instruction.
 - **FR-003**: The AI-generated dashboard MUST stream its output progressively; components
   MUST begin appearing before the full response is complete.
 - **FR-004**: The AI-generated dashboard MUST be composed exclusively from a predefined
-  set of components: ProjectCard, BurndownChart, and StatusBadge. The AI MUST NOT
-  produce arbitrary markup outside these components.
+  set of components: Dashboard (root container), ProjectCard, BurndownChart, and
+  StatusBadge. The AI MUST NOT produce arbitrary markup outside these components.
 - **FR-005**: A plain-language prose declaration file MUST define what the AI dashboard
   shows, its priorities, and any emphasis rules — written in natural language, not in
   a structured format such as YAML or JSON. Changes to this file MUST be reflected on
@@ -148,8 +148,11 @@ new instruction.
 - **FR-009**: The StatusBadge component MUST indicate whether a project is on-budget,
   at-risk, or over-budget using visually distinct states. The percentage thresholds
   that determine each state are NOT hardcoded — they are defined by the operator in
-  the plain-prose dashboard declaration file and interpreted by the AI model at
-  generation time.
+  the plain-prose dashboard declaration file. The API reads and parses these thresholds
+  from the declaration at runtime and exposes them via `GET /api/ai-dashboard/config`
+  so the frontend components always reflect the operator's intent. Default fallback
+  thresholds (at-risk ≥ 80%, over-budget > 100%) apply when no threshold is specified
+  in the declaration.
 - **FR-010**: When the AI service is unavailable, the toggle MUST be disabled or clearly
   indicate unavailability; the legacy dashboard MUST remain accessible.
 - **FR-011**: The AI-generated dashboard layout MUST be cached in memory after its first
@@ -163,14 +166,18 @@ new instruction.
 
 - **Dashboard Declaration**: A human-readable text file (committed to the repository)
   that describes the desired AI dashboard layout, data priorities, and emphasis rules.
-  Modified by operators without code changes.
+  Modified by operators without code changes; updateable at runtime via
+  `PUT /api/ai-dashboard/declaration` (no image rebuild required).
 - **AI-Generated Layout**: The dashboard view produced by the local AI model at runtime
   by interpreting the declaration and the current project data.
-- **ProjectCard**: A component that displays one project's budget and consumption summary.
+- **Dashboard**: The required root container component that wraps all layout children.
+  Every openUI Lang program MUST end with `root = Dashboard([...])`.
+- **ProjectCard**: A component that displays one project's budget and consumption summary,
+  including an embedded StatusBadge whose thresholds are read from the declaration at runtime.
 - **BurndownChart**: A component that renders the ideal vs. actual burndown line chart
   for one project.
 - **StatusBadge**: A component that shows the budget health state of a project
-  (on-budget / at-risk / over-budget).
+  (on-budget / at-risk / over-budget). Rendered inline within ProjectCard.
 - **Local AI Service**: The containerised AI model that receives the declaration and
   data, and generates the dashboard layout using the defined component set.
 
@@ -188,8 +195,8 @@ new instruction.
   after this feature is deployed — zero regressions.
 - **SC-004**: A non-developer can change the dashboard declaration and observe the
   changed AI output without touching any code file other than the declaration.
-- **SC-005**: 100% of rendered components are from the defined set (ProjectCard,
-  BurndownChart, StatusBadge) — no uncontrolled markup is ever injected.
+- **SC-005**: 100% of rendered components are from the defined set (Dashboard,
+  ProjectCard, BurndownChart, StatusBadge) — no uncontrolled markup is ever injected.
 - **SC-006**: The AI service container starts and the required model becomes available
   as part of a single `docker compose up` with no additional manual steps. On first
   run, the model is pulled automatically; on subsequent runs it loads from the local

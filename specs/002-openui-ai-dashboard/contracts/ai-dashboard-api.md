@@ -27,14 +27,15 @@ Content-Type: text/event-stream
 Cache-Control: no-cache
 Connection: keep-alive
 
-data: <ProjectCard projectId="1" />\n\n
-data: <StatusBadge status="on-budget" />\n\n
-data: <BurndownChart projectId="1" />\n\n
-...
+data: card1 = ProjectCard(1)\n\n
+data:  \n\n
+data: chart1 = BurndownChart(1)\n\n
+data:  \n\n
+data: root = Dashboard([card1, chart1])\n\n
 data: [DONE]\n\n
 ```
 
-- Each `data:` line contains one openUI Lang token or component tag.
+- Each `data:` line contains one or more openUI Lang tokens.
 - The stream ends with the sentinel `data: [DONE]`.
 - The frontend begins rendering as tokens arrive (progressive display).
 
@@ -45,20 +46,19 @@ HTTP/1.1 200 OK
 Content-Type: text/event-stream
 Cache-Control: no-cache
 
-data: {"cached":true,"layout":"<full openUI Lang string>"}\n\n
+data: {"cached":true,"layout":"card1 = ProjectCard(1)\n..."}\n\n
 data: [DONE]\n\n
 ```
 
-The frontend renderer handles both streaming and cached responses identically via
-the `@openuidev/react-lang` parser.
+The frontend renderer handles both streaming and cached responses identically.
 
 ### Error responses
 
 | Status | Condition | Body |
 |--------|-----------|------|
-| 503 | Ollama container unreachable | `{"error":"ai_unavailable"}` |
-| 504 | Ollama did not respond within 30 s | `{"error":"ai_timeout"}` |
-| 500 | Declaration file missing or unreadable | `{"error":"declaration_missing"}` |
+| 503 | Ollama container unreachable | `{"error":"AI_UNAVAILABLE","status":503}` |
+| 504 | Ollama did not respond within 30 s | `{"error":"AI_TIMEOUT","status":504}` |
+| 500 | Internal error | `{"error":"internal_error","status":500}` |
 
 ---
 
@@ -80,36 +80,127 @@ or disable the AI dashboard toggle (FR-010).
 | Field | Values | Meaning |
 |-------|--------|---------|
 | `ollama` | `ready` | Ollama is running and model is loaded |
-| `ollama` | `pulling` | Model auto-pull is in progress (show "AI initialising…" state) |
+| `ollama` | `pulling` | Model auto-pull is in progress |
 | `ollama` | `unavailable` | Ollama container not reachable |
 | `model` | string | Model name currently configured |
 | `cached` | boolean | Whether a cached layout exists (instant load available) |
 
-The frontend polls this endpoint on page load and when the toggle is activated.
+---
+
+## GET /api/ai-dashboard/config
+
+Returns the thresholds parsed from the current declaration file. The frontend uses
+these to compute StatusBadge state in ProjectCard — honouring FR-009 without hardcoding.
+
+### Response
+
+```json
+{
+  "thresholds": {
+    "atRisk": 80,
+    "overBudget": 100
+  }
+}
+```
+
+`atRisk` and `overBudget` are integers (percentage points). Defaults are 80 and 100
+when the declaration does not specify thresholds.
+
+---
+
+## PUT /api/ai-dashboard/declaration
+
+Updates the dashboard declaration at runtime, persisting it to the `api_data` Docker
+volume. Invalidates the layout cache immediately. No image rebuild required (FR-005,
+SC-004).
+
+### Request
+
+```
+PUT /api/ai-dashboard/declaration
+Content-Type: application/json
+
+{ "content": "Show all in_progress projects ordered by budget consumed..." }
+```
+
+`content` must be a non-empty string. Maximum length is not enforced but should be kept
+under 4 KB for reliable model context window handling.
+
+### Response (success)
+
+```json
+{ "ok": true }
+```
+
+### Response (error)
+
+```
+HTTP/1.1 400 Bad Request
+
+{ "error": "content must be a non-empty string" }
+```
+
+---
+
+## GET /api/ai-dashboard/debug
+
+Full diagnostic dump for troubleshooting. Returns Ollama reachability, declaration file
+status, project list, and a test Ollama completion. Not intended for production use.
+
+### Response (schema)
+
+```json
+{
+  "ollamaUrl": "http://ollama:11434",
+  "model": "qwen2.5:7b",
+  "declarationPath": "/app/dashboard.declaration.md",
+  "ollamaStatus": "ready",
+  "declarationFound": true,
+  "declarationLength": 243,
+  "declarationPreview": "Show all in_progress projects...",
+  "projectCount": 5,
+  "projectIds": [{ "id": 1, "name": "Project A" }],
+  "ollamaHttpStatus": 200,
+  "ollamaRawResponse": { "choices": [...] },
+  "parsedContent": "card1 = ProjectCard(1)..."
+}
+```
 
 ---
 
 ## openUI Lang Component Grammar
 
 The AI model produces output conforming to this grammar. The renderer ignores any
-tag not in this set.
+name not registered in the component registry.
 
 ```
-layout     ::= (component | whitespace)*
-component  ::= "<" name props "/>"
-name       ::= "ProjectCard" | "BurndownChart" | "StatusBadge"
-props      ::= (prop)*
-prop       ::= name "=" '"' value '"'
+program    ::= (statement "\n")* root_stmt
+statement  ::= varName " = " component
+root_stmt  ::= "root = Dashboard([" varList "])"
+component  ::= compName "(" args ")"
+compName   ::= "Dashboard" | "ProjectCard" | "BurndownChart"
+args       ::= INTEGER             (for ProjectCard, BurndownChart)
+             | "[" varList "]"     (for Dashboard children)
+varList    ::= varName ("," " " varName)*
+varName    ::= [a-z][a-zA-Z0-9]*
 
-ProjectCard props:
-  projectId  INTEGER   required   InvoiceNinja project ID
-
-BurndownChart props:
-  projectId  INTEGER   required   InvoiceNinja project ID
-
-StatusBadge props:
-  status     STRING    required   "on-budget" | "at-risk" | "over-budget"
+Dashboard  args:  children  ARRAY    required  Array of component variables
+ProjectCard args: projectId INTEGER  required  InvoiceNinja project ID
+BurndownChart args: projectId INTEGER required InvoiceNinja project ID
 ```
 
-Any output outside this grammar (prose text, unknown tags, raw HTML) is silently
+**Example** (two projects, IDs 1 and 3):
+
+```
+card1  = ProjectCard(1)
+chart1 = BurndownChart(1)
+card3  = ProjectCard(3)
+chart3 = BurndownChart(3)
+root   = Dashboard([card1, chart1, card3, chart3])
+```
+
+Any output outside this grammar (prose text, unknown names, HTML tags) is silently
 discarded by the renderer. This is the primary XSS defence (SC-005).
+
+StatusBadge is rendered inline by ProjectCard using declaration-driven thresholds —
+it is not a model output target.

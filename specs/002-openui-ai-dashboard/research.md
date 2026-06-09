@@ -7,18 +7,23 @@
 
 ## Decision 1: openUI SDK + Ollama Compatibility
 
-**Decision**: Use `@openuidev/react-lang` and `@openuidev/react-headless` in the frontend.
-Connect them to Ollama via the Fastify API using Ollama's OpenAI-compatible endpoint
+**Decision**: Use `@openuidev/react-lang` in the frontend (parser + renderer). SSE
+streaming is handled by the native browser `EventSource` API via a custom `fetchAIDashboard`
+helper. Connect to Ollama via Fastify using Ollama's OpenAI-compatible endpoint
 (`/v1/chat/completions`). The API acts as the AI proxy — the browser never calls Ollama
 directly.
 
-**Rationale**: openUI's SDK communicates through any OpenAI-compatible streaming endpoint.
-Ollama exposes `/v1/chat/completions` with SSE streaming at `http://ollama:11434`. Routing
-the request through Fastify (rather than directly from the browser) satisfies Constitution
-Principle III and keeps Ollama off the public network.
+**Rationale**: openUI's SDK provides the authoritative openUI Lang parser and renderer.
+`@openuidev/react-headless` (originally planned for streaming state management) is not
+needed — the `EventSource` + React `useState` pattern is simpler and has no additional
+dependencies. Ollama exposes `/v1/chat/completions` with SSE at `http://ollama:11434`.
+Routing through Fastify satisfies Constitution Principle III and keeps Ollama off the
+public network.
 
 **Alternatives considered**:
 - Direct browser → Ollama: violates Principle III (layer bypass); exposes Ollama port.
+- `@openuidev/react-headless` for streaming: adds a dependency for functionality already
+  covered by `EventSource`; removed during implementation.
 - Custom OpenUI Lang parser without the SDK: significant implementation effort; SDK is
   the authoritative parser for the streaming DSL.
 
@@ -112,21 +117,30 @@ technically correct solution to the sandboxing concern deferred from `/speckit-c
 
 ---
 
-## Decision 6: Declaration File Location and Loading
+## Decision 6: Declaration File Location, Loading, and Runtime Updates
 
-**Decision**: The declaration file is `dashboard.declaration.md` at the repository root.
-It is read at runtime by the Fastify API service (filesystem access within the container)
-via `fs.readFile`. The file is `COPY`-ed into the API container image at build time, and
-also available via a bind mount during development (so edits take effect without rebuild).
+**Decision**: The declaration file lives at `api/dashboard.declaration.md` and is baked
+into the API container image at build time via `COPY dashboard.declaration.md ./`. A
+named Docker volume (`api_data`) mounted at `/app/data` in the API container acts as a
+runtime override layer: `readDeclaration()` checks `/app/data/dashboard.declaration.md`
+first; if absent it falls back to the baked-in copy. A `PUT /api/ai-dashboard/declaration`
+endpoint writes to the data volume and invalidates the cache, so operators can update the
+declaration without any image rebuild.
 
-**Rationale**: Placing it at the project root makes it immediately visible to operators.
-The API service reads it (not the frontend), so the prose is kept server-side and not
-exposed to the browser as a static asset. This also avoids Vite treating it as a build
-asset.
+**Rationale**: Portainer bind mounts failed in practice — Docker created a directory at
+the mount path when the source file did not exist, making the container refuse to start.
+Baking the file into the image ensures a reliable default; the named volume + PUT endpoint
+provides a rebuild-free runtime override path (fulfilling FR-005 / SC-004). The API
+service reads the file (not the frontend), so the prose stays server-side and is not
+exposed to browsers as a static asset.
 
 **Alternatives considered**:
-- `frontend/public/dashboard.declaration.md` (static asset): exposes declaration to
-  anyone who can reach the frontend; leaks prompt engineering to end users.
+- Repository-root location with bind mount: Portainer-incompatible (directory vs. file
+  mount conflict); abandoned after repeated deployment failures.
+- `DASHBOARD_DECLARATION` env var: rejected by operator preference ("env should not have
+  that much content").
+- `frontend/public/` (static asset): exposes declaration to end users; leaks prompt
+  engineering.
 - Database-stored declaration: over-engineering for a single config file.
 
 ---
@@ -136,8 +150,8 @@ asset.
 | Unknown | Resolution |
 |---------|-----------|
 | openUI + Ollama compatibility | Via OpenAI-compatible `/v1/chat/completions`; proxied through Fastify |
-| Streaming transport | SSE (`text/event-stream`) from Fastify; EventSource in browser |
-| Cache implementation | In-memory Map, keyed on SHA-256 of declaration content |
+| Streaming transport | SSE (`text/event-stream`) from Fastify; native `EventSource` in browser |
+| Cache implementation | In-memory object, keyed on SHA-256 of declaration content |
 | Ollama model auto-pull | Custom `entrypoint.sh` + named volume for persistence |
 | XSS / component sandboxing | openUI component registry; arbitrary tags silently ignored |
-| Declaration file location | `dashboard.declaration.md` at repo root; read by API at runtime |
+| Declaration file location | `api/dashboard.declaration.md` baked into image; runtime override via `api_data` volume + `PUT /api/ai-dashboard/declaration` |
