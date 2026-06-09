@@ -1,5 +1,6 @@
 import React, { useContext } from 'react';
 import { AIDashboardContext } from './AIDashboardContext.jsx';
+import StatusBadge from './StatusBadge.jsx';
 
 export default function ProjectCardAI({ props: { projectId } }) {
   const { projects } = useContext(AIDashboardContext);
@@ -11,6 +12,7 @@ export default function ProjectCardAI({ props: { projectId } }) {
   const remaining = Math.max(0, budgeted_hours - total_logged);
   const isOver    = progress > 100;
   const color     = isOver ? '#da4830' : '#117cc1';
+  const status    = progress > 100 ? 'over-budget' : progress >= 80 ? 'at-risk' : 'on-budget';
 
   return (
     <div style={{
@@ -22,7 +24,10 @@ export default function ProjectCardAI({ props: { projectId } }) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text, #333)' }}>{name}</span>
-        <span style={{ fontSize: 12, color, fontWeight: 700 }}>{progress}%</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <StatusBadge props={{ status }} />
+          <span style={{ fontSize: 12, color, fontWeight: 700 }}>{progress}%</span>
+        </div>
       </div>
       <div style={{ height: 3, background: 'var(--border, #ddd)', borderRadius: 2, marginBottom: 10, overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${Math.min(progress, 100)}%`, background: color, borderRadius: 2 }} />

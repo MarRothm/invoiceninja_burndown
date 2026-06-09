@@ -64,25 +64,24 @@ OpenUI Lang syntax rules:
 - Arguments are POSITIONAL — write only values, not key=value pairs
 
 Available components (positional args):
-- ProjectCard(projectId)   — project summary card; projectId is a number
-- BurndownChart(projectId) — burndown chart;        projectId is a number
-- StatusBadge(status)      — status badge;           status is one of "on-budget", "at-risk", "over-budget"
-- Dashboard(children)      — root container;         children is an array of components  ← REQUIRED
+- ProjectCard(projectId)   — project summary card with built-in status badge; projectId is a number
+- BurndownChart(projectId) — burndown chart; projectId is a number
+- Dashboard(children)      — root container; children is an array of components  ← REQUIRED
 
 Rules:
 1. The LAST statement MUST be:  root = Dashboard([...all components...])
 2. Use EXACT project IDs from the project list.
 3. Place every component inside Dashboard's children array.
 4. Output NOTHING outside the program (no greetings, no explanations).
+5. EVERY project in the list with status "in_progress" MUST appear in the output — including projects with 0 hours logged. Do not skip any project.
+6. Order projects by their \`progress\` field as directed in the declaration.
 
 Example for two projects (IDs 1 and 3):
 card1 = ProjectCard(1)
 chart1 = BurndownChart(1)
-badge1 = StatusBadge("on-budget")
 card3 = ProjectCard(3)
 chart3 = BurndownChart(3)
-badge3 = StatusBadge("at-risk")
-root = Dashboard([card1, chart1, badge1, card3, chart3, badge3])`;
+root = Dashboard([card1, chart1, card3, chart3])`;
 
 // ── Ollama streaming ───────────────────────────────────────────────────────
 
