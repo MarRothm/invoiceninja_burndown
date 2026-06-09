@@ -65,8 +65,8 @@ services:
 
   api:
     build:
-      context:    ./api
-      dockerfile: Dockerfile
+      context:    .
+      dockerfile: api/Dockerfile
     image: burndown/api:latest
     pull_policy: never
     container_name: burndown_api
