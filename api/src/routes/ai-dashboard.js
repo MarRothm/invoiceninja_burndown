@@ -1,4 +1,4 @@
-import { checkOllamaStatus, generateOrCachedLayout, isCached, debugInfo } from '../services/ai-dashboard.js';
+import { checkOllamaStatus, generateOrCachedLayout, getThresholds, isCached, debugInfo, updateDeclaration } from '../services/ai-dashboard.js';
 
 export async function aiDashboardRoutes(fastify) {
   // GET /ai-dashboard/status — AI service health check for toggle enablement
@@ -11,8 +11,24 @@ export async function aiDashboardRoutes(fastify) {
     };
   });
 
+  // GET /ai-dashboard/config — parsed thresholds from declaration (for frontend StatusBadge)
+  fastify.get('/ai-dashboard/config', async () => {
+    const thresholds = await getThresholds();
+    return { thresholds };
+  });
+
+  // PUT /ai-dashboard/declaration — update declaration at runtime without image rebuild
+  fastify.put('/ai-dashboard/declaration', async (req, reply) => {
+    const { content } = req.body ?? {};
+    if (typeof content !== 'string' || !content.trim()) {
+      return reply.code(400).send({ error: 'content must be a non-empty string' });
+    }
+    await updateDeclaration(content);
+    return { ok: true };
+  });
+
   // GET /ai-dashboard/debug — full diagnostic (non-streaming)
-  fastify.get('/ai-dashboard/debug', async (req, reply) => {
+  fastify.get('/ai-dashboard/debug', async () => {
     return debugInfo();
   });
 

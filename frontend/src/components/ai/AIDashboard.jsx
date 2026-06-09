@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Renderer } from '@openuidev/react-lang';
 import { library } from './components.js';
 import { AIDashboardContext } from './AIDashboardContext.jsx';
-import { fetchProjects, fetchAIDashboard } from '../../hooks/api.js';
+import { fetchProjects, fetchAIDashboard, fetchAIDashboardConfig } from '../../hooks/api.js';
 
 const TIMEOUT_MS = 30_000;
 
@@ -11,7 +11,8 @@ export default function AIDashboard({ theme, ollamaStatus }) {
   const [streaming, setStreaming] = useState(false);
   const [status, setStatus]       = useState('idle'); // idle | loading | streaming | ready | error | unavailable
   const [errorMsg, setErrorMsg]   = useState('');
-  const [projects, setProjects]   = useState([]);
+  const [projects, setProjects]     = useState([]);
+  const [thresholds, setThresholds] = useState({ atRisk: 80, overBudget: 100 });
   const closeRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -63,9 +64,10 @@ export default function AIDashboard({ theme, ollamaStatus }) {
     });
   }, []);
 
-  // Load projects for context once on mount
+  // Load projects + declaration thresholds for context once on mount
   useEffect(() => {
     fetchProjects().then(setProjects).catch(() => {});
+    fetchAIDashboardConfig().then(cfg => setThresholds(cfg.thresholds)).catch(() => {});
   }, []);
 
   // Auto-load when component mounts or Ollama comes online
@@ -83,7 +85,7 @@ export default function AIDashboard({ theme, ollamaStatus }) {
     };
   }, [ollamaStatus, load]);
 
-  const contextValue = { projects, theme };
+  const contextValue = { projects, theme, thresholds };
 
   // ── Unavailable state ──
   if (status === 'unavailable') {
