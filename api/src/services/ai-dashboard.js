@@ -177,7 +177,10 @@ export async function generateOrCachedLayout(writeSSE) {
   }
 
   // Cache miss — fetch projects and stream from Ollama
-  const projects = await listProjectsWithStats();
+  // Sort by budget consumption descending so the model renders them in the declared order
+  const projects = (await listProjectsWithStats())
+    .filter(p => p.status === 'in_progress')
+    .sort((a, b) => b.progress - a.progress);
   let accumulated = '';
 
   await streamFromOllama(declaration, projects, (token) => {
