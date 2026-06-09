@@ -158,6 +158,8 @@ export async function listProjectsWithStats() {
       COALESCE(SUM(te.hours) FILTER (WHERE te.status = 'completed'), 0) AS total_logged
     FROM projects p
     LEFT JOIN time_entries te ON te.project_id = p.id
+    WHERE NOT COALESCE((p.raw->>'is_deleted')::boolean, false)
+      AND p.archived_at IS NULL
     GROUP BY p.id
     ORDER BY
       CASE WHEN p.actual_end_date IS NOT NULL OR (p.deadline IS NOT NULL AND p.deadline <= CURRENT_DATE) THEN 1 ELSE 0 END ASC,

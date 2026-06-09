@@ -13,6 +13,7 @@
 ### Session 2026-06-09
 
 - Q: When generation finishes and all tokens have been received, what should the dashboard do without any user action? → A: Auto-complete — the dashboard silently transitions to the full layout the moment the last token is received, with no flicker, no reload button, and no user intervention required.
+- Q: Should deleted projects (soft-deleted in InvoiceNinja) be shown in the standard and AI dashboards? Besides deleted, should archived projects also be hidden? → A: Hide both — projects with `is_deleted: true` AND projects with a non-null `archived_at` timestamp must be excluded from all dashboard views (standard and AI).
 
 ### Session 2026-06-02
 
@@ -131,6 +132,10 @@ new instruction.
   the renderer MUST automatically re-process the complete accumulated response and
   display all components — the user MUST NOT be required to reload or take any action
   to see the full layout.
+- What happens when a project is soft-deleted or archived in InvoiceNinja?
+  The project MUST be excluded from both the standard and AI dashboards on the next
+  sync + page load. Deleted and archived projects are never shown to the user regardless
+  of their budget or time-tracking state.
 
 ## Requirements *(mandatory)*
 
@@ -175,6 +180,10 @@ new instruction.
   instantly from cache without re-invoking the AI model. The cache is ephemeral — it does
   not need to survive container restarts; the first visit after a restart triggers
   regeneration.
+- **FR-012**: Both the standard (legacy) dashboard and the AI-generated dashboard MUST
+  exclude projects that are soft-deleted (`is_deleted: true`) or archived
+  (`archived_at IS NOT NULL`) in InvoiceNinja. Such projects MUST NOT appear in any
+  project list, ProjectCard, BurndownChart, or status summary visible to the user.
 
 ### Key Entities
 
