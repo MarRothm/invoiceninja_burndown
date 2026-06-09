@@ -51,7 +51,7 @@ export default function AIDashboard({ theme, ollamaStatus }) {
       },
       onDone: () => {
         clearTimeout(timerRef.current);
-        setStatus('ready');
+        setStatus(prev => prev === 'error' ? prev : 'ready');
         setStreaming(false);
       },
       onError: (err) => {
