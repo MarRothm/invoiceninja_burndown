@@ -37,8 +37,7 @@ export async function checkOllamaStatus() {
 // ── Declaration file ───────────────────────────────────────────────────────
 
 const DEFAULT_DECLARATION = `Show all projects with their burndown charts and current status.
-For each project display a ProjectCard, a BurndownChart, and a StatusBadge.
-Order by project name.`;
+For each project display a ProjectCard, a BurndownChart, and a StatusBadge.`;
 
 async function readDeclaration() {
   try {
@@ -218,6 +217,7 @@ export async function debugInfo() {
     const decl = await readFile(declarationPath, 'utf8');
     result.declarationFound = true;
     result.declarationLength = decl.length;
+    result.declarationPreview = decl.slice(0, 120);
   } catch {
     result.declarationFound = false;
   }
