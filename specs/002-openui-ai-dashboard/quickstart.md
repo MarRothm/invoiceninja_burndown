@@ -6,15 +6,34 @@
 
 ## First-Time Setup
 
-```bash
-# 1. Start the full stack (Ollama will auto-pull qwen2.5:7b on first run — ~5 GB download)
-docker compose up -d --build
+### Production / Portainer deployment
 
-# 2. Monitor model pull progress
+Images are pre-built by GitHub Actions and published to `ghcr.io`. Portainer pulls them
+automatically when the stack is deployed or when the GHA webhook fires. No local build required.
+
+```bash
+# 1. In Portainer, deploy the stack using docker-compose.yml from the repository.
+#    Portainer will pull all ghcr.io images automatically.
+#    Ollama will auto-pull qwen2.5:7b on first container start (~5 GB download).
+
+# 2. Monitor Ollama model pull progress
 docker logs -f burndown_ollama
 
-# 3. When you see "model pulled successfully", the AI dashboard is ready
-# Open the app and click the "AI Dashboard" toggle in the nav bar
+# 3. When you see "model pulled successfully", the AI dashboard is ready.
+#    Open the app and click the "AI Dashboard" toggle in the nav bar.
+```
+
+To push a new deployment: merge to `master`. GitHub Actions builds, pushes to `ghcr.io`,
+and calls the Portainer webhook automatically. No manual steps required.
+
+### Local development (build from source)
+
+```bash
+# Use the dev overlay to restore build contexts
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+
+# Monitor Ollama model pull progress
+docker logs -f burndown_ollama
 ```
 
 ---
@@ -33,14 +52,16 @@ curl -X PUT http://localhost:6088/api/ai-dashboard/declaration \
 
 The change takes effect on the next dashboard load (cache is cleared automatically).
 
-### Option B — Rebuild (edit the source file)
+### Option B — Bake into image via GHA (edit the source file)
 
 ```bash
 # Edit the declaration in the repository
 nano api/dashboard.declaration.md   # or your preferred editor
 
-# Rebuild the API image to bake in the new file
-docker compose up -d --build api
+# Commit and push to master — GitHub Actions rebuilds the api image and
+# triggers the Portainer webhook automatically. No manual docker build needed.
+git add api/dashboard.declaration.md && git commit -m "chore: update dashboard declaration"
+git push origin master
 ```
 
 **Example declarations**:
@@ -66,8 +87,9 @@ Reload the AI dashboard after updating — the layout reflects the new declarati
 
 1. Create the React component in `frontend/src/components/ai/MyComponent.ai.jsx`
 2. Define its schema and register it in `frontend/src/components/ai/components.js` (follow the existing `ProjectCardDef` / `BurndownChartDef` pattern)
-3. Rebuild the frontend: `docker compose up -d --build frontend`
-4. Update `api/dashboard.declaration.md` (or use the `PUT` endpoint) to reference the new component by name.
+3. Validate locally: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build frontend`
+4. Commit and push to `master` — GHA rebuilds the frontend image and triggers Portainer redeploy.
+5. Update `api/dashboard.declaration.md` (or use the `PUT` endpoint) to reference the new component by name.
 
 The system prompt in `api/src/services/ai-dashboard.js` also needs updating to tell the model about the new component and its positional argument order.
 

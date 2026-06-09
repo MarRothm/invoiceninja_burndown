@@ -1,0 +1,40 @@
+# Local development overlay — restores build contexts for all custom services.
+# Portainer never reads this file; it is for developer workstation use only.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# This overrides pull_policy to build from local source instead of pulling
+# pre-built images from ghcr.io.
+
+services:
+
+  postgres:
+    build:
+      context:    .
+      dockerfile: postgres/Dockerfile
+    pull_policy: build
+
+  ollama:
+    build:
+      context:    ./ollama
+      dockerfile: Dockerfile
+    pull_policy: build
+
+  api:
+    build:
+      context:    ./api
+      dockerfile: Dockerfile
+    pull_policy: build
+
+  worker:
+    build:
+      context:    ./api
+      dockerfile: Dockerfile
+    pull_policy: build
+
+  frontend:
+    build:
+      context:    ./frontend
+      dockerfile: Dockerfile
+    pull_policy: build

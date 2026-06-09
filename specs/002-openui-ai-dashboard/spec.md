@@ -14,6 +14,9 @@
 
 - Q: When generation finishes and all tokens have been received, what should the dashboard do without any user action? → A: Auto-complete — the dashboard silently transitions to the full layout the moment the last token is received, with no flicker, no reload button, and no user intervention required.
 - Q: Should deleted projects (soft-deleted in InvoiceNinja) be shown in the standard and AI dashboards? Besides deleted, should archived projects also be hidden? → A: Hide both — projects with `is_deleted: true` AND projects with a non-null `archived_at` timestamp must be excluded from all dashboard views (standard and AI).
+- Q: Where should GitHub Actions publish built Docker images? → A: GitHub Container Registry (ghcr.io) — uses existing GitHub credentials, free for private packages, PAT-based auth compatible with Portainer.
+- Q: How should Portainer detect and apply a new image after a GitHub Actions push? → A: Portainer stack webhook — GitHub Actions calls the Portainer webhook URL as the final step after a successful image push, triggering an immediate event-driven redeploy.
+- Q: What event should trigger the GitHub Actions image build and push? → A: Push to master branch — every commit merged to master builds a new image tagged `latest` and triggers the Portainer webhook.
 
 ### Session 2026-06-02
 
@@ -160,6 +163,11 @@ new instruction.
   container. No external AI API calls are permitted for the dashboard generation. The
   required model MUST be pulled automatically on first startup — no manual model
   installation steps are required of the operator beyond running `docker compose up`.
+- **FR-013**: Custom-built service images MUST be built and published to GitHub Container
+  Registry (ghcr.io) via a GitHub Actions workflow triggered on every push to the `master`
+  branch. Local image builds are NOT permitted as the deployment mechanism. After a
+  successful image push, the workflow MUST call the Portainer stack webhook to trigger an
+  immediate redeploy — no manual operator action is required to apply a new image.
 - **FR-007**: The ProjectCard component MUST display: project name, budgeted hours,
   hours consumed, and remaining hours.
 - **FR-008**: The BurndownChart component MUST render the ideal vs. actual burndown
@@ -246,6 +254,12 @@ new instruction.
   minimum viable dashboard; additional components are out of scope for this feature.
 - Hardware assumptions: the deployment host has sufficient memory to run
   `qwen2.5:7b` alongside the existing stack services (minimum ~8 GB RAM free).
+- **CI/CD**: Custom service images are built exclusively via GitHub Actions on push to
+  `master` and published to `ghcr.io`. Local `docker build` is not the deployment path.
+  The Portainer deployment is configured with a stack webhook URL; the GHA workflow
+  calls this webhook after every successful image push. GitHub repository secrets must
+  hold the `GHCR_TOKEN` (for registry push) and `PORTAINER_WEBHOOK_URL` (for redeploy
+  trigger). Ollama uses the official upstream image and is not rebuilt by this pipeline.
 - **Design system**: All colors, typography, spacing, and component styling for this
   feature MUST be sourced exclusively from `design.md` (InvoiceNinja design system
   tokens at the repository root). This is the single source of truth for styling —

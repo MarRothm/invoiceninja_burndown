@@ -2,16 +2,16 @@ version: "3.9"
 
 # ─────────────────────────────────────────────
 #  Burndown Stack  –  Portainer / Docker Compose
+#  Images are pre-built by GitHub Actions and published to ghcr.io.
+#  For local development with build contexts, use:
+#    docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 # ─────────────────────────────────────────────
 
 services:
 
   postgres:
-    build:
-      context:    .
-      dockerfile: postgres/Dockerfile
-    image: burndown/postgres:latest
-    pull_policy: never
+    image: ghcr.io/marrothm/burndown-postgres:latest
+    pull_policy: always
     container_name: burndown_postgres
     restart: unless-stopped
     environment:
@@ -45,11 +45,8 @@ services:
       retries:  5
 
   ollama:
-    build:
-      context: ./ollama
-      dockerfile: Dockerfile
-    image: burndown/ollama:latest
-    pull_policy: never
+    image: ghcr.io/marrothm/burndown-ollama:latest
+    pull_policy: always
     container_name: burndown_ollama
     restart: unless-stopped
     volumes:
@@ -64,11 +61,8 @@ services:
       start_period: 300s
 
   api:
-    build:
-      context:    ./api
-      dockerfile: Dockerfile
-    image: burndown/api:latest
-    pull_policy: never
+    image: ghcr.io/marrothm/burndown-api:latest
+    pull_policy: always
     container_name: burndown_api
     restart: unless-stopped
     environment:
@@ -94,11 +88,8 @@ services:
       - "3000"
 
   worker:
-    build:
-      context:    ./api
-      dockerfile: Dockerfile
-    image: burndown/worker:latest
-    pull_policy: never
+    image: ghcr.io/marrothm/burndown-api:latest
+    pull_policy: always
     container_name: burndown_worker
     command: ["node", "src/worker.js"]
     restart: unless-stopped
@@ -119,11 +110,8 @@ services:
       - invoiceninja
 
   frontend:
-    build:
-      context:    ./frontend
-      dockerfile: Dockerfile
-    image: burndown/frontend:latest
-    pull_policy: never
+    image: ghcr.io/marrothm/burndown-frontend:latest
+    pull_policy: always
     container_name: burndown_frontend
     restart: unless-stopped
     depends_on:
