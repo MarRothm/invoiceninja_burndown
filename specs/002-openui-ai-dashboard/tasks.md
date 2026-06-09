@@ -115,6 +115,15 @@ description: "Task list for OpenUI AI-Generated Dashboard (002-openui-ai-dashboa
 
 ---
 
+## Phase 7: Clarification 2026-06-09 — Deleted/Archived Project Filtering (FR-012)
+
+**Goal**: Deleted (`is_deleted: true`) and archived (`archived_at IS NOT NULL`) projects must not appear in either the standard or AI dashboard.
+
+- [x] T039 Add `WHERE NOT COALESCE((p.raw->>'is_deleted')::boolean, false) AND p.archived_at IS NULL` filter to `listProjectsWithStats()` in `api/src/services/burndown.js` (covers both legacy and AI dashboard since both call this function)
+- [x] T040 [P] Update `specs/002-openui-ai-dashboard/spec.md` — add clarification to Session 2026-06-09, add FR-012, add edge case for deleted/archived projects
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
