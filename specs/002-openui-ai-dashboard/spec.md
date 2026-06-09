@@ -10,6 +10,10 @@
 
 ## Clarifications
 
+### Session 2026-06-09
+
+- Q: When generation finishes and all tokens have been received, what should the dashboard do without any user action? → A: Auto-complete — the dashboard silently transitions to the full layout the moment the last token is received, with no flicker, no reload button, and no user intervention required.
+
 ### Session 2026-06-02
 
 - Q: What format should the Dashboard Declaration file use? → A: Plain-language prose (no YAML or structured syntax required).
@@ -74,6 +78,9 @@ status badges reflect actual budget status from the API.
 3. **Given** a project is over budget, **When** the AI dashboard renders, **Then**
    that project's status badge reflects the over-budget state distinctly from
    on-budget projects.
+4. **Given** the AI dashboard has finished generating (last token received), **When**
+   the streaming state ends, **Then** the complete layout is displayed automatically
+   showing all in_progress projects — no user action, page reload, or retry required.
 
 ---
 
@@ -119,6 +126,11 @@ new instruction.
 - What does the user see while the cache is being rebuilt after a declaration change?
   A loading/streaming state is shown; the previous cached layout is not used as a
   fallback (the new layout streams progressively as tokens arrive).
+- What happens when the partial layout during streaming shows fewer components than expected (e.g., only the first project card)?
+  The partial view during streaming is acceptable; however, the moment streaming ends,
+  the renderer MUST automatically re-process the complete accumulated response and
+  display all components — the user MUST NOT be required to reload or take any action
+  to see the full layout.
 
 ## Requirements *(mandatory)*
 
@@ -129,7 +141,9 @@ new instruction.
 - **FR-002**: The legacy dashboard MUST remain fully functional and visually unchanged
   after this feature is introduced — it is the default view.
 - **FR-003**: The AI-generated dashboard MUST stream its output progressively; components
-  MUST begin appearing before the full response is complete.
+  MUST begin appearing before the full response is complete. When the last token is
+  received, the dashboard MUST automatically display the complete final layout — all
+  projects and their components — without any user action, page reload, or retry.
 - **FR-004**: The AI-generated dashboard MUST be composed exclusively from a predefined
   set of components: Dashboard (root container), ProjectCard, BurndownChart, and
   StatusBadge. The AI MUST NOT produce arbitrary markup outside these components.
