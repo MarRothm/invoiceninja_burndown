@@ -7,7 +7,9 @@ description: "Task list for OpenUI AI-Generated Dashboard (002-openui-ai-dashboa
 
 **Input**: Design documents from `/specs/002-openui-ai-dashboard/`
 
-**Prerequisites**: plan.md ✅, spec.md ✅, research.md ✅, data-model.md ✅, contracts/ ✅
+**Prerequisites**: plan.md ✅, spec.md ✅, research.md ✅, data-model.md ✅, contracts/ ✅, quickstart.md ✅
+
+**Last updated**: 2026-06-09 — Phase 9 added for streaming completion reliability (clarification session)
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -139,6 +141,21 @@ description: "Task list for OpenUI AI-Generated Dashboard (002-openui-ai-dashboa
 
 ---
 
+## Phase 9: Clarification 2026-06-09 — Streaming Completion Reliability (FR-003, SC-007)
+
+**Goal**: Fix the persistent bug where the AI dashboard does not render unless a manual page reload is performed. Enforce the streaming state machine contracts defined in the 2026-06-09 clarification session: localStorage-restore auto-trigger, explicit done sentinel as sole completion signal, stall detection, and empty-response error state.
+
+**Independent Test**: With AI dashboard mode set in localStorage → reload page → AI dashboard MUST begin streaming automatically (no toggle click required). After streaming completes (`data: [DONE]` received) → full layout MUST appear without any user action. Close SSE connection mid-stream without `[DONE]` → error state MUST appear (not a blank screen). Receive `[DONE]` with 0 components parsed → error + retry button MUST appear. Simulate 15-second token silence → stall prompt MUST appear while partial layout remains visible.
+
+- [x] T045 [US1] Update `AIDashboard.jsx` — on component mount, read `burndown_dashboard_mode` from localStorage; if value is `'ai'`, immediately call `startStreaming()` (identical path to toggle-click); this fixes the reload-required bug at `frontend/src/components/ai/AIDashboard.jsx`
+- [x] T046 [US2] Update `AIDashboard.jsx` — enforce sentinel-as-sole-ready-trigger: transition to `ready` ONLY on `data: [DONE]` event; SSE `onerror` / connection close without prior `[DONE]` MUST transition to `error` state with message "Generation incomplete — connection lost" at `frontend/src/components/ai/AIDashboard.jsx`
+- [x] T047 [US2] Update `AIDashboard.jsx` — implement stall detection: reset a `setTimeout(15000)` on every received SSE token; if the timer fires before cancellation, transition to `stalled` status and render a non-destructive "Generation seems stuck — retry?" prompt; cancel the timer on `[DONE]` receipt or connection close at `frontend/src/components/ai/AIDashboard.jsx`
+- [x] T048 [US2] Update `AIDashboard.jsx` — empty-response guard after `[DONE]`: if accumulated response parses to 0 renderable components, transition to `error` status and render "Dashboard generation failed — retry" with a retry button; do not render a blank dashboard or silently fall back to legacy at `frontend/src/components/ai/AIDashboard.jsx`
+
+**Checkpoint**: Page reload with AI mode in localStorage → AI dashboard auto-streams; `[DONE]` → full layout appears without reload; connection drop → error (not blank); 0 components → error + retry; 15-second silence → stall prompt with partial layout preserved
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -151,6 +168,7 @@ description: "Task list for OpenUI AI-Generated Dashboard (002-openui-ai-dashboa
 - **Polish (Phase 6)**: All implementation phases complete
 - **FR-012 Filtering (Phase 7)**: Can be applied independently; no dependency on Phase 3–6
 - **CI/CD Pipeline (Phase 8)**: Independent of Phase 3–7 feature work; depends only on Phase 1 (docker-compose.yml exists); T042, T043, T044 are parallel; T041 can also run in parallel with T042–T044 (different files)
+- **Streaming Reliability (Phase 9)**: Depends on Phase 4 (AIDashboard.jsx must exist); T045–T048 are sequential (same file); T045 is the highest-priority fix (resolves the reload-required bug)
 
 ### User Story Dependencies
 
@@ -198,6 +216,7 @@ Task T024: "Register all four components in components.js"
 4. US3 → Declaration-driven config + runtime updates via PUT endpoint
 5. Polish → Documentation and spec alignment complete
 6. CI/CD Pipeline (Phase 8) → GHA builds and pushes images; Portainer redeploys on every master push
+7. Streaming Reliability (Phase 9) → T045 fixes reload bug; T046–T048 harden sentinel, stall detection, and empty-response handling
 
 ---
 

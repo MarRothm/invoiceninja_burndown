@@ -36,8 +36,14 @@ data: [DONE]\n\n
 ```
 
 - Each `data:` line contains one or more openUI Lang tokens.
-- The stream ends with the sentinel `data: [DONE]`.
+- The stream MUST end with the sentinel `data: [DONE]` as the final event.
 - The frontend begins rendering as tokens arrive (progressive display).
+- The frontend MUST treat `data: [DONE]` as the **sole** trigger for transitioning to the
+  `ready` (complete) state. Connection close without `[DONE]` is an error, not a completion.
+- If no new token arrives for **15 seconds** after the last received token, the frontend
+  MUST display a "generation seems stuck — retry?" prompt (stall detection, SC-007).
+- If `[DONE]` is received but zero renderable components were parsed, the frontend MUST
+  show an error message with a retry button (not a blank screen).
 
 ### Response — cache hit (instant)
 

@@ -5,24 +5,34 @@ import { AIDashboardContext } from './AIDashboardContext.jsx';
 import { fetchProjects, fetchAIDashboard, fetchAIDashboardConfig } from '../../hooks/api.js';
 
 const TIMEOUT_MS = 30_000;
+const STALL_MS   = 15_000; // T047: stall detection — no new token for 15 s
 
 export default function AIDashboard({ theme, ollamaStatus }) {
   const [response, setResponse]   = useState('');
   const [streaming, setStreaming] = useState(false);
-  const [status, setStatus]       = useState('idle'); // idle | loading | streaming | ready | error | unavailable
+  const [status, setStatus]       = useState('idle'); // idle|loading|streaming|stalled|ready|error|unavailable
   const [errorMsg, setErrorMsg]   = useState('');
   const [projects, setProjects]     = useState([]);
   const [thresholds, setThresholds] = useState({ atRisk: 80, overBudget: 100 });
-  // Incremented when streaming ends so Renderer remounts and re-parses the full response
   const [renderKey, setRenderKey]   = useState(0);
-  const closeRef = useRef(null);
-  const timerRef = useRef(null);
+
+  const closeRef      = useRef(null);
+  const timerRef      = useRef(null);
+  const stallTimerRef = useRef(null); // T047
+  const responseRef   = useRef('');   // T048: sync accumulation for onDone empty-response guard
+
+  // T045: keep a ref to current status so the auto-retry effect can read it
+  // without adding status as a dependency (which would cause infinite loops).
+  const statusRef = useRef(status);
+  statusRef.current = status;
 
   const load = useCallback(() => {
     if (closeRef.current) closeRef.current();
     clearTimeout(timerRef.current);
+    clearTimeout(stallTimerRef.current);
 
     setResponse('');
+    responseRef.current = '';
     setStatus('loading');
     setStreaming(false);
     setErrorMsg('');
@@ -45,27 +55,53 @@ export default function AIDashboard({ theme, ollamaStatus }) {
           setStatus('streaming');
           setStreaming(true);
         }
+        responseRef.current += token;
         setResponse(prev => prev + token);
+
+        // T047: reset stall timer on every received token
+        clearTimeout(stallTimerRef.current);
+        stallTimerRef.current = setTimeout(() => setStatus('stalled'), STALL_MS);
       },
       onCached: (layout) => {
         clearTimeout(timerRef.current);
+        clearTimeout(stallTimerRef.current);
+        responseRef.current = layout;
         setResponse(layout);
         setStatus('ready');
         setStreaming(false);
       },
       onDone: () => {
         clearTimeout(timerRef.current);
-        setStatus(prev => prev === 'error' ? prev : 'ready');
+        clearTimeout(stallTimerRef.current); // T047: cancel stall timer on completion
+
         setStreaming(false);
-        // Force Renderer to remount with the complete accumulated response so all
-        // components are visible without a manual reload (FR-003)
+
+        // T048: empty-response guard — [DONE] with no renderable components is an error
+        const accumulated = responseRef.current;
+        const hasComponents = /ProjectCard|BurndownChart|Dashboard/.test(accumulated);
+        if (!hasComponents || !accumulated.trim()) {
+          setStatus('error');
+          setErrorMsg('Dashboard generation failed — no components were generated.');
+          return;
+        }
+
+        // T046: transition to ready ONLY via this [DONE] sentinel path
+        setStatus(prev => prev === 'error' ? prev : 'ready');
+        // Force Renderer to remount with the complete accumulated response (FR-003)
         setRenderKey(k => k + 1);
       },
       onError: (err) => {
         clearTimeout(timerRef.current);
-        setStatus('error');
-        setErrorMsg(err.message ?? 'Failed to load AI dashboard.');
+        clearTimeout(stallTimerRef.current);
         setStreaming(false);
+        // T045: AI_UNAVAILABLE maps to the dedicated unavailable state so the
+        // auto-retry effect can distinguish it from a generic error.
+        if (err.message === 'AI_UNAVAILABLE') {
+          setStatus('unavailable');
+        } else {
+          setStatus('error');
+          setErrorMsg(err.message ?? 'Failed to load AI dashboard.');
+        }
       },
     });
   }, []);
@@ -76,19 +112,25 @@ export default function AIDashboard({ theme, ollamaStatus }) {
     fetchAIDashboardConfig().then(cfg => setThresholds(cfg.thresholds)).catch(() => {});
   }, []);
 
-  // Auto-load when component mounts or Ollama comes online
+  // T045: Auto-trigger on mount — identical to toggle-click path.
+  // Fixes the localStorage-restore reload bug: the component being mounted means
+  // AI mode is active; don't wait for the ollamaStatus prop to cycle through 'unavailable'.
   useEffect(() => {
-    if (ollamaStatus === 'ready') {
-      load();
-    } else if (ollamaStatus === 'unavailable') {
-      setStatus('unavailable');
-    } else if (ollamaStatus === 'pulling') {
-      setStatus('loading');
-    }
+    load();
     return () => {
       if (closeRef.current) closeRef.current();
       clearTimeout(timerRef.current);
+      clearTimeout(stallTimerRef.current);
     };
+  }, [load]); // load is stable (useCallback []); fires once on mount
+
+  // T045: Auto-retry when Ollama comes back online after the initial attempt failed.
+  // Only retries from dead states (unavailable/error) — does not interrupt active streaming.
+  useEffect(() => {
+    if (ollamaStatus === 'ready' &&
+        (statusRef.current === 'unavailable' || statusRef.current === 'error')) {
+      load();
+    }
   }, [ollamaStatus, load]);
 
   const contextValue = { projects, theme, thresholds };
@@ -135,10 +177,9 @@ export default function AIDashboard({ theme, ollamaStatus }) {
     );
   }
 
-  // ── Empty state ──
-  const isReady = status === 'ready' || status === 'streaming';
-  const isEmpty = isReady && !response.trim();
-  if (status === 'ready' && isEmpty) {
+  // ── Empty state (ready but response parsed to nothing) ──
+  const isActive = status === 'ready' || status === 'streaming' || status === 'stalled';
+  if (status === 'ready' && isActive && !response.trim()) {
     return (
       <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)' }}>
         <div style={{ fontSize: 14, marginBottom: 16 }}>
@@ -157,14 +198,44 @@ export default function AIDashboard({ theme, ollamaStatus }) {
     );
   }
 
-  // ── Streaming / ready state ──
+  // ── Streaming / stalled / ready state ──
   return (
     <AIDashboardContext.Provider value={contextValue}>
       <div>
-        {streaming && (
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>◈</span>
-            Generating…
+        {/* T047: show generating indicator while streaming, stall prompt while stalled */}
+        {(streaming || status === 'stalled') && (
+          <div style={{
+            fontSize: 11,
+            color: 'var(--muted)',
+            marginBottom: 12,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}>
+            {status === 'stalled' ? (
+              <>
+                <span>Generation seems stuck —</span>
+                <button
+                  onClick={load}
+                  style={{
+                    padding: '2px 8px',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 3,
+                    fontSize: 11,
+                    color: 'var(--accent)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Retry
+                </button>
+              </>
+            ) : (
+              <>
+                <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>◈</span>
+                Generating…
+              </>
+            )}
           </div>
         )}
         {response && (
@@ -172,7 +243,7 @@ export default function AIDashboard({ theme, ollamaStatus }) {
             key={renderKey}
             response={response}
             library={library}
-            isStreaming={streaming}
+            isStreaming={streaming || status === 'stalled'}
             onParseResult={(result) => {
               result?.meta?.errors?.forEach(e => {
                 if (e.code !== 'unknown-component') console.warn('[openui]', e);
