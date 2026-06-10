@@ -38,6 +38,17 @@ new API route + new frontend view alongside unchanged legacy view
 - First streamed component: ≤ 10 s on local network (SC-002)
 - Cached layout load: ≤ 500 ms (SC-002)
 - Toggle switch: ≤ 1 s (SC-001)
+- Stall prompt visible: ≤ 1 s after 15-second no-token threshold (SC-007)
+
+**Streaming State Machine Constraints** (Clarified 2026-06-09):
+- `ready` state MUST only be entered on receipt of explicit `data: [DONE]` sentinel —
+  never on connection close or silence timeout alone (FR-003)
+- On page load, if `burndown_dashboard_mode = 'ai'` is set in localStorage, the frontend
+  MUST auto-initiate streaming immediately — identical to a toggle click (User Story 1 AS-4)
+- Stall detection: if no new SSE token arrives within 15 s of the last token, transition to
+  `stalled` state and show a non-destructive retry prompt while preserving partial layout (SC-007)
+- Empty-response: if `[DONE]` is received with 0 parsed components, show error + retry button
+- Sentinel-drop: if SSE connection closes without `[DONE]`, transition to `error` (incomplete)
 
 **Constraints**:
 - No external AI API calls — Ollama runs on the internal Docker network only

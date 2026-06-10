@@ -17,6 +17,11 @@
 - Q: Where should GitHub Actions publish built Docker images? → A: GitHub Container Registry (ghcr.io) — uses existing GitHub credentials, free for private packages, PAT-based auth compatible with Portainer.
 - Q: How should Portainer detect and apply a new image after a GitHub Actions push? → A: Portainer stack webhook — GitHub Actions calls the Portainer webhook URL as the final step after a successful image push, triggering an immediate event-driven redeploy.
 - Q: What event should trigger the GitHub Actions image build and push? → A: Push to master branch — every commit merged to master builds a new image tagged `latest` and triggers the Portainer webhook.
+- Q: When the page loads and localStorage has the AI dashboard as the active view (no toggle click), what must the frontend do? → A: Auto-trigger immediately — the frontend MUST start streaming (or load from cache) exactly as if the user had just clicked the toggle; no additional user action is required.
+- Q: What signal definitively marks "streaming ended" to the frontend renderer? → A: Explicit done sentinel — the backend MUST emit a defined end-of-stream signal as the final event when generation is complete; the frontend MUST transition to the complete (fully rendered) layout state immediately upon receiving this sentinel, not on connection close or silence timeout alone.
+- Q: If the stream ends (sentinel received) but the AI generated zero renderable components, what must the user see? → A: Error with retry — display a "Dashboard generation failed — retry" message with a button that re-triggers streaming without a page reload; do not show a blank screen or silently fall back to legacy.
+- Q: What should happen if streaming starts successfully but then stalls mid-stream (no new tokens for an extended period)? → A: Separate stall timeout — if no new token is received for a defined interval (e.g. 15 s) after the last token, show a non-destructive "generation seems stuck — retry?" prompt while keeping the partial layout visible; this is distinct from the initial 30 s response timeout.
+- Q: What is the normative stall timeout duration (the fixed interval after the last received token before the "seems stuck" prompt appears)? → A: 15 seconds — if no new token arrives for 15 s after the last received token, the stall prompt MUST appear. This value is fixed, not configurable.
 
 ### Session 2026-06-02
 
@@ -53,6 +58,11 @@ the new experience. Nothing else can be validated without this working first.
 3. **Given** the AI service is unavailable, **When** a user attempts to switch to the
    AI dashboard, **Then** they see a clear error message and the legacy dashboard
    remains displayed.
+4. **Given** a user previously activated the AI dashboard and then reloads the page
+   (localStorage retains the AI dashboard preference), **When** the page finishes
+   loading, **Then** the AI dashboard MUST begin streaming (or serve from cache)
+   automatically — exactly as if the user had just clicked the toggle — with no
+   additional user action required.
 
 ---
 
@@ -115,8 +125,13 @@ new instruction.
 
 ### Edge Cases
 
-- What happens when the AI model takes more than 30 seconds to respond?
+- What happens when the AI model takes more than 30 seconds to respond (no first token)?
   The dashboard must show a loading indicator and time out gracefully with a retry option.
+- What happens if streaming has started (at least one token received) but then stalls with no new tokens?
+  The frontend MUST apply a separate stall timeout: if no new token arrives within 15 seconds
+  of the last received token, a non-destructive "generation seems stuck — retry?" prompt MUST
+  appear while the partial layout remains visible. The user MUST NOT be required to perform a
+  full page reload to recover. This 15-second stall threshold is fixed and not configurable.
 - What happens when the AI generates output referencing a component that does not exist?
   Only registered components are rendered; unknown component names are silently skipped
   or shown as a placeholder, never as a crash.
@@ -135,6 +150,18 @@ new instruction.
   the renderer MUST automatically re-process the complete accumulated response and
   display all components — the user MUST NOT be required to reload or take any action
   to see the full layout.
+- What happens if the stream ends (sentinel received) but the AI generated zero renderable components?
+  The frontend MUST display a "Dashboard generation failed — retry" message with a button
+  that re-triggers streaming without a page reload. A blank screen or silent fallback to the
+  legacy dashboard is not acceptable.
+- What happens if the stream connection drops before the end-of-stream sentinel is received?
+  The frontend MUST detect the unclean termination (connection close without sentinel) and
+  show a "generation incomplete — retry" state rather than silently displaying a partial
+  layout as complete.
+- What happens when the page is reloaded while the AI dashboard preference is set in localStorage?
+  The AI dashboard MUST auto-activate and begin streaming (or serve from cache) immediately
+  on page load — the user MUST NOT need to click the toggle again or perform any other action
+  to see the AI dashboard. This path must behave identically to a manual toggle activation.
 - What happens when a project is soft-deleted or archived in InvoiceNinja?
   The project MUST be excluded from both the standard and AI dashboards on the next
   sync + page load. Deleted and archived projects are never shown to the user regardless
@@ -149,9 +176,12 @@ new instruction.
 - **FR-002**: The legacy dashboard MUST remain fully functional and visually unchanged
   after this feature is introduced — it is the default view.
 - **FR-003**: The AI-generated dashboard MUST stream its output progressively; components
-  MUST begin appearing before the full response is complete. When the last token is
-  received, the dashboard MUST automatically display the complete final layout — all
-  projects and their components — without any user action, page reload, or retry.
+  MUST begin appearing before the full response is complete. The backend service MUST
+  emit an explicit end-of-stream signal as the final event when generation is complete.
+  Upon receiving this signal, the frontend MUST immediately and automatically display
+  the complete final layout — all projects and their components — without any user
+  action, page reload, or retry. The frontend MUST NOT rely on connection close or
+  silence timeout as the sole trigger for this transition.
 - **FR-004**: The AI-generated dashboard MUST be composed exclusively from a predefined
   set of components: Dashboard (root container), ProjectCard, BurndownChart, and
   StatusBadge. The AI MUST NOT produce arbitrary markup outside these components.
@@ -232,6 +262,9 @@ new instruction.
   as part of a single `docker compose up` with no additional manual steps. On first
   run, the model is pulled automatically; on subsequent runs it loads from the local
   volume immediately.
+- **SC-007**: If streaming has started and no new token is received for 15 seconds, a
+  "generation seems stuck — retry?" prompt MUST be visible within 1 second of the
+  stall threshold being reached, without removing any partial layout already on screen.
 
 ## Assumptions
 
@@ -242,7 +275,10 @@ new instruction.
   `qwen2.5:7b` via Ollama, which will be shared with the Monatsabschluss project's
   Ollama instance to avoid duplicate infrastructure.
 - The toggle persists its state in browser local storage so the user's preference
-  is remembered across page reloads.
+  is remembered across page reloads. When the page loads with the AI dashboard
+  preference set in localStorage, the frontend MUST auto-trigger streaming (or serve
+  from cache) immediately — equivalent to the user having just clicked the toggle.
+  No additional user action is required to activate the AI dashboard on page reload.
 - The legacy dashboard is the default view; users who have never interacted with the
   toggle always see the legacy dashboard first.
 - The declaration file is a plain-language prose file (no structured syntax such as

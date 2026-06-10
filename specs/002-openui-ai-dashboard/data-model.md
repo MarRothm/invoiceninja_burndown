@@ -146,10 +146,34 @@ root   = Dashboard([card1, chart1])
 | State variable | Type | Description |
 |----------------|------|-------------|
 | `mode` | `'legacy' \| 'ai'` | Current dashboard view; persisted in `localStorage` key `burndown_dashboard_mode` |
-| `status` | `'idle' \| 'loading' \| 'streaming' \| 'ready' \| 'error' \| 'unavailable'` | AI service availability and generation state |
+| `status` | `'idle' \| 'loading' \| 'streaming' \| 'stalled' \| 'ready' \| 'error' \| 'unavailable'` | AI service availability and generation state |
 | `response` | `string` | Full or partial openUI Lang response from API stream |
 | `projects` | `Project[]` | Fetched from `/api/projects`; passed to AI components via context |
 | `thresholds` | `{ atRisk: number, overBudget: number }` | Parsed from declaration via `GET /api/ai-dashboard/config`; defaults 80/100 |
+
+### Status state machine
+
+| Transition | Trigger | Resulting status |
+|---|---|---|
+| → `loading` | User clicks toggle **OR** page loads with `burndown_dashboard_mode = 'ai'` in localStorage | `loading` |
+| `loading` → `streaming` | First SSE `data:` token received | `streaming` |
+| `streaming` → `stalled` | No new token for **15 seconds** since last received token | `stalled` |
+| `stalled` → `streaming` | New token received after stall | `streaming` |
+| `streaming` → `ready` | `data: [DONE]` sentinel received **and** ≥ 1 renderable component parsed | `ready` |
+| `streaming` → `error` | `data: [DONE]` received **but** 0 components parsed (empty/garbled output) | `error` (empty-response) |
+| `streaming` → `error` | SSE connection closes **without** a `[DONE]` sentinel (stream drop) | `error` (incomplete) |
+| `loading` → `unavailable` | `GET /api/ai-dashboard/status` returns `ollama: "unavailable"` | `unavailable` |
+| `loading` → `error` | Initial response timeout (30 s) | `error` (timeout) |
+| `error` → `loading` | User clicks the retry button | `loading` |
+
+**Key invariant**: The `ready` state MUST only be entered upon explicit receipt of `data: [DONE]`.
+Connection close and silence timeout MUST NOT trigger `ready`. This is the sentinel contract
+from FR-003 (Clarified 2026-06-09).
+
+**localStorage-restore path**: On every page load, before rendering, the component MUST read
+`burndown_dashboard_mode` from localStorage. If the value is `'ai'`, the component MUST
+immediately initiate streaming (or serve from cache) — identical to the user having just
+clicked the toggle. No additional user action is required (FR — Clarified 2026-06-09).
 
 ## AIDashboardContext (React context)
 

@@ -37,10 +37,14 @@ export async function fetchAIDashboardConfig() {
 
 export function fetchAIDashboard({ onToken, onCached, onDone, onError }) {
   const source = new EventSource(`${BASE}/ai-dashboard`);
+  // T046: track whether [DONE] was received so onerror can distinguish normal
+  // close (after sentinel) from a genuine connection drop mid-stream.
+  let doneSeen = false;
 
   source.onmessage = (e) => {
     const data = e.data;
     if (data === '[DONE]') {
+      doneSeen = true;
       source.close();
       onDone?.();
       return;
@@ -66,8 +70,15 @@ export function fetchAIDashboard({ onToken, onCached, onDone, onError }) {
 
   source.onerror = () => {
     source.close();
-    onError?.(new Error('SSE connection failed'));
+    // T046: only surface an error if [DONE] was never received — a connection close
+    // after the sentinel is normal and must not overwrite the ready state.
+    if (!doneSeen) {
+      onError?.(new Error('Generation incomplete — connection lost'));
+    }
   };
 
-  return () => source.close();
+  return () => {
+    doneSeen = true; // T046: suppress spurious onerror after caller-initiated close
+    source.close();
+  };
 }
