@@ -6,6 +6,11 @@ vi.mock('../src/services/burndown.js', () => ({
   getBurndown:           vi.fn(async () => null),
 }));
 
+vi.mock('../src/services/timesheet.js', async (importActual) => ({
+  parseMonth:   (await importActual()).parseMonth,
+  getTimesheet: vi.fn(async () => null),
+}));
+
 vi.mock('../src/services/sync.js', () => ({
   runFullSync: vi.fn(async () => ({ projects: 0, entries: 0, ms: 1 })),
 }));
@@ -18,6 +23,7 @@ import rateLimit from '@fastify/rate-limit';
 import { projectRoutes } from '../src/routes/projects.js';
 import { getBurndown, listProjectsWithStats } from '../src/services/burndown.js';
 import { runFullSync } from '../src/services/sync.js';
+import { getTimesheet } from '../src/services/timesheet.js';
 
 async function buildApp() {
   const app = Fastify({ logger: false });
@@ -112,6 +118,44 @@ describe('GET /api/projects/:id/burndown', () => {
     // parseInt of a huge number is still finite; this should succeed input validation
     // but we test it doesn't crash the server
     expect([200, 400, 404]).toContain(res.statusCode);
+  });
+});
+
+// ── /projects/:id/timesheet ───────────────────────────────────────────────
+
+describe('GET /api/projects/:id/timesheet', () => {
+  it('returns 200 with timesheet data for valid project and month', async () => {
+    getTimesheet.mockResolvedValueOnce({
+      project: { id: 1, name: 'X' }, month: '2026-09', days: [], total: 0, last_synced_at: null,
+    });
+    const res = await app.inject({ method: 'GET', url: '/api/projects/1/timesheet?month=2026-09' });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).month).toBe('2026-09');
+    expect(getTimesheet).toHaveBeenLastCalledWith(1, '2026-09');
+  });
+
+  it('returns 404 when project not found', async () => {
+    getTimesheet.mockResolvedValueOnce(null);
+    const res = await app.inject({ method: 'GET', url: '/api/projects/9999/timesheet?month=2026-09' });
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body).error).toBe('Project not found');
+  });
+
+  it('returns 400 for invalid month', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/projects/1/timesheet?month=2026-13' });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe('Invalid month, expected YYYY-MM');
+  });
+
+  it('returns 400 when month is missing', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/projects/1/timesheet' });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('returns 400 for non-numeric id', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/projects/abc/timesheet?month=2026-09' });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/invalid project id/i);
   });
 });
 

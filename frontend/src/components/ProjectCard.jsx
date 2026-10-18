@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function ProjectCard({ project, selected, onClick }) {
+export default function ProjectCard({ project, selected, onClick, onOpenTimesheet }) {
   const { name, progress, total_logged, budgeted_hours, deadline, actual_end_date, status } = project;
   const isClosed = status === 'closed';
   const isOver   = progress > 100;
@@ -8,8 +8,14 @@ export default function ProjectCard({ project, selected, onClick }) {
   const endDate  = actual_end_date || deadline;
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={e => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
+      }}
       style={{
         display:       'block',
         width:         '100%',
@@ -33,6 +39,17 @@ export default function ProjectCard({ project, selected, onClick }) {
             background: 'var(--border)', color: 'var(--muted)',
           }}>CLOSED</span>
         )}
+        {onOpenTimesheet && (
+          <button
+            onClick={e => { e.stopPropagation(); onOpenTimesheet(); }}
+            title="Timesheet"
+            aria-label={`Open timesheet for ${name}`}
+            style={{
+              background: 'none', border: 'none', padding: '0 2px',
+              color: 'var(--muted)', fontSize: 13, lineHeight: 1, cursor: 'pointer',
+            }}
+          >▦</button>
+        )}
       </div>
 
       {/* Progress bar */}
@@ -52,6 +69,6 @@ export default function ProjectCard({ project, selected, onClick }) {
         <span>{total_logged}h / {budgeted_hours}h</span>
         {endDate && <span>{new Date(endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>}
       </div>
-    </button>
+    </div>
   );
 }

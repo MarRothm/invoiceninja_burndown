@@ -92,6 +92,7 @@ InvoiceNinja API
 GET  /api/health                    → Status
 GET  /api/projects                  → All projects with stats
 GET  /api/projects/:id/burndown     → Burndown data for a project
+GET  /api/projects/:id/timesheet?month=YYYY-MM → Daily totals of completed hours for one month
 POST /api/sync                      → Trigger manual sync
 GET  /api/ai-dashboard              → AI-generated dashboard layout (SSE stream)
 GET  /api/ai-dashboard/status       → Ollama availability + model status
@@ -99,6 +100,21 @@ GET  /api/ai-dashboard/config       → Parsed thresholds from declaration (used
 PUT  /api/ai-dashboard/declaration  → Update declaration at runtime (body: { content: "…" })
 GET  /api/ai-dashboard/debug        → Full AI diagnostic (Ollama status, declaration, projects)
 ```
+
+## Timesheet
+
+A monthly timesheet per project lists one total of booked time per calendar day, to transfer
+hours into other systems (customer portals, time-tracking tools, spreadsheets).
+
+- Open it with the **▦** icon on any project card in the sidebar (legacy and AI mode) or the
+  **▦ Timesheet** button in the project header.
+- Navigate months with **‹ / ›** (up to the current month). Days without bookings show `0`,
+  weekends are shaded.
+- **Copy month** copies tab-separated `date ⇥ hours` lines — paste into a spreadsheet as two columns.
+  Click a single value to copy only that day.
+- **Download CSV** saves `timesheet_<project>_<YYYY-MM>.csv` (header `date,hours`, UTF-8).
+- Toggle **1.75 / 1:45** for decimal hours or hours:minutes; the choice is remembered per browser.
+- Only completed time entries count (same rule as the burndown); data is as of the last sync.
 
 ## AI Dashboard
 

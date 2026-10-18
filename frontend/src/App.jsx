@@ -4,6 +4,7 @@ import BurndownChart from './components/BurndownChart.jsx';
 import ThemeSelector from './components/ThemeSelector.jsx';
 import DashboardToggle from './components/DashboardToggle.jsx';
 import AIDashboard from './components/ai/AIDashboard.jsx';
+import TimesheetModal from './components/TimesheetModal.jsx';
 import { fetchProjects, fetchBurndown, triggerSync, fetchAIStatus } from './hooks/api.js';
 import { useTheme } from './hooks/useTheme.js';
 
@@ -31,6 +32,8 @@ export default function App() {
   );
   const [aiStatus,     setAIStatus]     = useState({ ollama: 'unavailable', cached: false });
   const [aiReloadKey,  setAiReloadKey]  = useState(0);
+  const [timesheetProject, setTimesheetProject] = useState(null);
+  const closeTimesheet = useCallback(() => setTimesheetProject(null), []);
 
   const loadProjects = useCallback(async () => {
     try {
@@ -137,6 +140,7 @@ export default function App() {
             project={p}
             selected={selected?.id === p.id}
             onClick={() => setSelected(p)}
+            onOpenTimesheet={() => setTimesheetProject(p)}
           />
         ))}
 
@@ -172,9 +176,25 @@ export default function App() {
             {/* Header */}
             <div style={{ marginBottom: 28 }}>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>PROJECT</div>
-              <h1 style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.1 }}>
-                {selected.name}
-              </h1>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <h1 style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.1 }}>
+                  {selected.name}
+                </h1>
+                <button
+                  onClick={() => setTimesheetProject(selected)}
+                  style={{
+                    padding: '6px 12px',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 4,
+                    color: 'var(--accent)',
+                    fontSize: 12,
+                    transition: 'opacity 0.15s ease-in-out',
+                  }}
+                >
+                  ▦ Timesheet
+                </button>
+              </div>
               {selected.deadline && (
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
                   Deadline: {new Date(selected.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
@@ -240,6 +260,10 @@ export default function App() {
         )}
         </>)} {/* end legacy view */}
       </main>
+
+      {timesheetProject && (
+        <TimesheetModal project={timesheetProject} onClose={closeTimesheet} />
+      )}
     </div>
   );
 }

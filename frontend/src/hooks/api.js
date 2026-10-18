@@ -13,6 +13,12 @@ export async function fetchBurndown(projectId) {
   return res.json();
 }
 
+export async function fetchTimesheet(projectId, month) {
+  const res = await fetch(`${BASE}/projects/${projectId}/timesheet?month=${encodeURIComponent(month)}`);
+  if (!res.ok) throw new Error('Failed to fetch timesheet');
+  return res.json();
+}
+
 export async function triggerSync() {
   const res = await fetch(`${BASE}/sync`, { method: 'POST' });
   if (!res.ok) throw new Error('Sync failed');
