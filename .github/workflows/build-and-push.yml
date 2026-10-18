@@ -54,6 +54,3 @@ jobs:
           file: frontend/Dockerfile
           push: true
           tags: ghcr.io/marrothm/burndown-frontend:latest
-
-      - name: Trigger Portainer redeploy
-        run: curl -f -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}"

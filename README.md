@@ -23,6 +23,10 @@ Images are built automatically by GitHub Actions on every push to `master` and p
 to `ghcr.io`. Deploy the stack in Portainer using `docker-compose.yml` — images are pulled
 from the registry; no local build is required.
 
+Portainer runs on the local network only and is not reachable from GitHub. After a new
+image build, redeploy manually in Portainer: **Stacks → burndown → Update the stack** with
+**Re-pull image and redeploy** enabled.
+
 On first start, Ollama pulls `qwen2.5:7b` (~5 GB). Subsequent starts are instant.
 
 ### Local development
@@ -141,7 +145,7 @@ followed by a BurndownChart below it.
 Status thresholds: at-risk >= 80%, over-budget > 100%.
 ```
 
-After saving the file, commit and push to `master` — GitHub Actions rebuilds the `burndown-api` image and triggers the Portainer webhook automatically.
+After saving the file, commit and push to `master` — GitHub Actions rebuilds the `burndown-api` image; then redeploy the stack in Portainer (see [Portainer deployment](#portainer-deployment-production)).
 
 To update the declaration **without** rebuilding, use the API:
 
@@ -188,11 +192,7 @@ Docker images are built and published automatically via GitHub Actions on every 
 
 ### GitHub Secrets required
 
-| Secret | Description |
-|--------|-------------|
-| `PORTAINER_WEBHOOK_URL` | Portainer stack webhook URL — called after every successful image push to trigger immediate redeploy |
-
-> **Note**: Registry authentication uses the built-in `GITHUB_TOKEN` (no manual secret needed). Ensure the workflow has `packages: write` permission — this is already set in `.github/workflows/build-and-push.yml`.
+None. Registry authentication uses the built-in `GITHUB_TOKEN`. Ensure the workflow has `packages: write` permission — this is already set in `.github/workflows/build-and-push.yml`.
 
 ### Images published
 
@@ -214,7 +214,7 @@ git push origin master
 GitHub Actions builds 4 images → pushes to ghcr.io
        │
        ▼
-POST $PORTAINER_WEBHOOK_URL
+Manual redeploy in local Portainer (Re-pull image and redeploy)
        │
        ▼
 Portainer pulls new images → redeploys stack
