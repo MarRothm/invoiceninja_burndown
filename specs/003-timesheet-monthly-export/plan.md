@@ -1,6 +1,6 @@
 # Implementation Plan: Monthly Timesheet for Transfer to External Systems
 
-**Branch**: `003-timesheet-monthly-export` | **Date**: 2026-10-18 | **Spec**: [spec.md](spec.md)
+**Branch**: `003-timesheet-monthly-export` | **Date**: 2026-10-18, updated 2026-10-19 (weekly subtotals) | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `specs/003-timesheet-monthly-export/spec.md`
 
@@ -13,6 +13,11 @@ value), CSV download, and a decimal ↔ h:mm toggle. A new endpoint
 `time_entries`; the frontend opens it in an overlay from a ▦ icon on every sidebar project
 card (available in legacy and AI mode) and from a button in the legacy project header
 (GUI Option C). No schema change, no new dependencies, no new services.
+
+**Increment 2 (2026-10-19, clarification session)**: weekly subtotals per Monday–Sunday week
+(FR-017–FR-020). The API extends the same endpoint additively with a `weeks` array covering
+the full weeks that touch the month (including greyed-out neighbouring-month days); `days`,
+`total`, Copy month and CSV stay month-only and unchanged.
 
 ## Technical Context
 
@@ -28,7 +33,7 @@ card (available in legacy and AI mode) and from a button in the legacy project h
 
 **Project Type**: Enhancement of existing web application (API + SPA)
 
-**Performance Goals**: Timesheet visible ≤ 2 s after open / month switch (SC-003) — single indexed aggregate query, ≤ 31 rows
+**Performance Goals**: Timesheet visible ≤ 2 s after open / month switch (SC-003) — single indexed aggregate query, ≤ 42 day rows (6 weeks) + ≤ 6 subtotal rows
 
 **Constraints**:
 - Read-only; InvoiceNinja remains the source of truth (FR-013, Constitution II)
@@ -36,8 +41,9 @@ card (available in legacy and AI mode) and from a button in the legacy project h
 - Clipboard must work on non-secure (HTTP) origins → fallback (research R4)
 - Styling only via existing CSS variables / design tokens (FR-014, Constitution V)
 - AI-dashboard openUI components stay unchanged (sidebar entry point covers AI mode)
+- Response change is additive only: existing `days`/`total` semantics unchanged (research R10)
 
-**Scale/Scope**: 1 API route, 1 service, 1 modal component, 1 utility module, small edits to `ProjectCard.jsx`, `App.jsx`, `api.js`, `README.md`
+**Scale/Scope**: 1 API route, 1 service, 1 modal component, 1 utility module, small edits to `ProjectCard.jsx`, `App.jsx`, `api.js`, `README.md`; increment 2 touches only `api/src/services/timesheet.js`, its tests, `TimesheetModal.jsx` and `README.md`
 
 ## Constitution Check
 
@@ -49,10 +55,11 @@ card (available in legacy and AI mode) and from a button in the legacy project h
 | II. InvoiceNinja Single Source of Truth | ✅ Pass | Reads synced `time_entries` only; no writes; same `status = 'completed'` rule as burndown |
 | III. Layered Service Architecture | ✅ Pass | Frontend → `GET /api/projects/:id/timesheet` → service → PostgreSQL; aggregation in API service |
 | IV. Security Hygiene | ✅ Pass | No new dependencies; strict input validation (`parseId`, month regex); CSV built client-side from numbers/ISO dates only (no formula injection surface — project name only in filename, slugified) |
-| V. Simplicity & Observable Configuration | ✅ Pass | No env vars, no new services, no frontend test tooling (R8); only existing CSS variables; `README.md` updated with endpoint + feature |
+| V. Simplicity & Observable Configuration | ✅ Pass | No env vars, no new services, no frontend test tooling (R8); only existing CSS variables; `README.md` updated with endpoint + feature (increment 2: Timesheet section mentions weekly subtotals) |
 
 **Post-design re-check (after Phase 1)**: ✅ All pass — design artifacts introduce no schema
-change, dependency, configuration, or cross-layer call.
+change, dependency, configuration, or cross-layer call. Re-checked for increment 2 (weekly
+subtotals): ✅ all pass — computation stays in the API service layer, response change is additive.
 
 ## Project Structure
 
@@ -82,8 +89,10 @@ api/
 │   │   └── projects.js          # Updated: add GET /projects/:id/timesheet (month validation)
 │   └── services/
 │       └── timesheet.js         # New: getTimesheet(projectId, month), buildMonthDays() (pure)
+│                                #   Inc. 2: buildWeeks(), isoWeek() (pure); query range widened to full weeks
 └── tests/
     ├── timesheet.test.js        # New: buildMonthDays (28/29/30/31 days, zeros, weekday, rounding)
+    │                            #   Inc. 2: buildWeeks (Sep/Aug/Feb 2021/Jun 2026 layouts, ISO week across year end)
     └── routes.test.js           # Updated: timesheet route 200 / 400 / 404
 
 frontend/
@@ -92,12 +101,13 @@ frontend/
     ├── components/
     │   ├── ProjectCard.jsx      # Updated: root <div role="button">, ▦ icon → onOpenTimesheet
     │   └── TimesheetModal.jsx   # New: overlay, month nav, format toggle, rows, copy/download
+    │                            #   Inc. 2: render by week, greyed neighbouring days, subtotal rows
     ├── hooks/
     │   └── api.js               # Updated: fetchTimesheet(projectId, month)
     └── utils/
         └── timesheet.js         # New: formatHours, toTSV, toCSV, fileName, shiftMonth, currentMonth, copyText
 
-README.md                        # Updated: endpoint table + Timesheet feature section
+README.md                        # Updated: endpoint table + Timesheet feature section (Inc. 2: weekly subtotals)
 ```
 
 **Structure Decision**: Additive change to the existing `api/` + `frontend/` web application.
@@ -116,6 +126,11 @@ under `frontend/src/components/ai/` untouched.
   state untouched when closed.
 - **Copy/Download**: client-side from the fetched `days` using the current format;
   clipboard fallback for HTTP origins (R4); TSV for paste, CSV with BOM for download (R5).
+- **Weekly subtotals (increment 2)**: query range widens to `[Monday of the week containing the
+  1st, Monday after the week containing the last day)`; `buildWeeks(month, rows)` returns one
+  entry per Monday–Sunday week with its 7 days (`in_month` flag), `hours`, ISO week number
+  and `spans_other_month`. `days` and `total` are still derived from in-month rows only
+  (R9–R11). The modal iterates `weeks` for display; Copy month / CSV keep using `days` (FR-019).
 
 ## Complexity Tracking
 

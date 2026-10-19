@@ -114,6 +114,10 @@ hours into other systems (customer portals, time-tracking tools, spreadsheets).
   **▦ Timesheet** button in the project header.
 - Navigate months with **‹ / ›** (up to the current month). Days without bookings show `0`,
   weekends are shaded.
+- Rows are grouped by ISO week (Mon–Sun) with a **weekly subtotal** after each Sunday, for
+  weekly transfers. Weeks crossing the month boundary show the neighbouring month's days greyed
+  out and count the full week ("incl. days from other month"). Subtotals are display-only —
+  they are not part of Copy month or the CSV.
 - **Copy month** copies tab-separated `date ⇥ hours` lines — paste into a spreadsheet as two columns.
   Click a single value to copy only that day.
 - **Download CSV** saves `timesheet_<project>_<YYYY-MM>.csv` (header `date,hours`, UTF-8).

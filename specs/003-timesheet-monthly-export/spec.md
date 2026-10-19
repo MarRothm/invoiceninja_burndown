@@ -8,14 +8,23 @@
 
 **Input**: User description: "add timesheet functionality so that I can easily transfer project time per day into other systems. Timesheet scope on per month. For every day one sum of booked time shall be shown. Suggest 3 options where to add this on the GUI."
 
+## Clarifications
+
+### Session 2026-10-19
+
+- Q: How are weekly subtotals computed for weeks that cross a month boundary? → A: Full Monday–Sunday week including days of the neighbouring month; such edge-week subtotals are marked "incl. days from other month" and are not expected to sum to the month total.
+- Q: Do weekly subtotals change copy/export? → A: No — subtotals are display-only; Copy month, single-value copy and CSV download stay one row per day without subtotal rows.
+- Q: Are the neighbouring month's days of edge weeks shown? → A: Yes — shown as greyed-out, read-only, non-copyable rows; excluded from month total, Copy month and CSV.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - View a monthly timesheet with one daily total (Priority: P1)
 
 As the operator, I open the timesheet for a project, pick a month, and see one row per
-calendar day of that month showing the total booked time for that day, plus a month total.
+calendar day of that month showing the total booked time for that day, weekly
+subtotals per Monday–Sunday week, plus a month total.
 I use this list to type the values into another system (e.g. a customer portal or an
-employer's time-tracking tool) day by day.
+employer's time-tracking tool) day by day, typically once per week.
 
 **Why this priority**: This is the core value — today the per-day sums have to be added up
 manually from individual InvoiceNinja tasks. A readable daily list alone already removes
@@ -23,7 +32,8 @@ that manual work.
 
 **Independent Test**: Select a project with known time entries in a given month, open the
 timesheet for that month, and verify each day's total equals the sum of that day's
-completed time entries and the month total equals the sum of all days.
+completed time entries, the month total equals the sum of the month's days, and each weekly
+subtotal equals the sum of its Monday–Sunday days.
 
 **Acceptance Scenarios**:
 
@@ -31,14 +41,24 @@ completed time entries and the month total equals the sum of all days.
    **When** the operator opens the September 2026 timesheet, **Then** the row for
    3 September shows 4.00 h.
 2. **Given** a month with days on which nothing was booked, **When** the timesheet is shown,
-   **Then** those days still appear with a total of 0 (visually de-emphasised), so the list
-   always has exactly as many rows as the month has days.
+   **Then** those days still appear with a total of 0 (visually de-emphasised), so every day
+   of the month is always listed.
 3. **Given** the timesheet is open, **When** the operator moves to the previous or next
    month, **Then** the list updates to that month without leaving the timesheet.
 4. **Given** the timesheet is opened for the first time in a session, **Then** it defaults
    to the current month.
 5. **Given** a month, **When** the timesheet is shown, **Then** a month total is displayed
    that equals the sum of all daily totals.
+6. **Given** September 2026 (1 Sep is a Tuesday), **When** the timesheet is shown, **Then**
+   a subtotal row follows each Sunday (6, 13, 20, 27 Sep) and one follows the trailing week
+   28 Sep – 04 Oct, each equal to the sum of its seven days.
+7. **Given** the week 28 Sep – 04 Oct with 2 h on 29 Sep and 3 h on 02 Oct, **When** the
+   September timesheet is shown, **Then** 01–04 Oct appear as greyed-out rows, the week
+   subtotal shows 5.00 h labelled "incl. days from other month", and the month total
+   includes only the 2 h.
+8. **Given** August 2026 (31 Aug is a Monday), **When** the timesheet is shown, **Then** the
+   first week starts on Mon 27 Jul with greyed-out July rows, and the last week
+   31 Aug – 06 Sep shows greyed-out September rows.
 
 ---
 
@@ -104,6 +124,7 @@ values follow the selected format; reload the page and verify the choice is reme
   timesheet shows the data as of the last sync and displays the last-sync time.
 - **Multiple entries spanning midnight**: attributed to the date the entry is recorded
   under in the synchronised data (no splitting across days).
+- **Weeks crossing a month boundary**: the subtotal includes the days of the neighbouring month (full week), is labelled "incl. days from other month", and the sum of weekly subtotals therefore may differ from the month total.
 - **Weekends**: shown like other days but visually distinguishable, so the operator can
   quickly skip them when typing values.
 - **Clipboard not available** (browser permission denied / insecure context): show a
@@ -132,9 +153,13 @@ extension if a multi-project monthly overview becomes necessary.
 
 - **FR-001**: System MUST provide a timesheet scoped to exactly one calendar month at a time.
 - **FR-002**: The timesheet MUST cover the time entries of exactly one project — the project whose timesheet action was used. Cross-project totals are out of scope.
-- **FR-003**: System MUST show one row for every calendar day of the selected month, each with a single sum of booked time for that day, including days with zero.
+- **FR-003**: System MUST show one row for every calendar day of the selected month (plus the neighbouring-month days of edge weeks per FR-020), each with a single sum of booked time for that day, including days with zero.
 - **FR-004**: Daily sums MUST include only completed time entries, using the same inclusion rules as the burndown calculation (no double counting, running timers excluded).
-- **FR-005**: System MUST show a month total equal to the sum of all daily totals.
+- **FR-005**: System MUST show a month total equal to the sum of all daily totals of the selected month.
+- **FR-017**: System MUST show a weekly subtotal after the last day (Sunday) of each Monday–Sunday week that has at least one day in the selected month, including a trailing partial week at month end.
+- **FR-018**: Each weekly subtotal MUST cover the full Monday–Sunday week, including days that belong to the previous or next month; when a week extends beyond the selected month, its subtotal MUST be labelled "incl. days from other month" (with the full date range, e.g. "28 Sep – 04 Oct").
+- **FR-019**: Weekly subtotals are display-only; they MUST NOT appear in the copied month text or the downloaded file, which remain exactly one row per day of the selected month.
+- **FR-020**: For weeks crossing the month boundary, the days belonging to the neighbouring month MUST be shown as greyed-out, read-only rows (no single-value copy) so the edge-week subtotal is traceable; they MUST be excluded from the month total, Copy month and the CSV download.
 - **FR-006**: Users MUST be able to navigate to previous and next months; the default is the current month; navigation beyond the current month is not offered.
 - **FR-007**: Users MUST be able to copy the full month (date + daily total, one line per day) to the clipboard in a format that pastes into spreadsheets as two columns.
 - **FR-008**: Users MUST be able to download the month as a comma-separated file with a header row, one row per day, named with project and month.
@@ -149,7 +174,8 @@ extension if a multi-project monthly overview becomes necessary.
 
 ### Key Entities
 
-- **Timesheet (month view)**: Represents one calendar month for one project; attributes: month, project, list of daily totals, month total, last-sync time.
+- **Timesheet (month view)**: Represents one calendar month for one project; attributes: month, project, list of daily totals, weekly subtotals, month total, last-sync time.
+- **Weekly Subtotal**: One Monday–Sunday week (identified by its Monday date and ISO week number) with the summed booked time of all seven days, a date range, and a flag whether it includes days outside the selected month.
 - **Daily Total**: One calendar date within the month and the summed booked time of all completed time entries for that date within the project.
 - **Time Entry** (existing): An individual booked time record synchronised from InvoiceNinja, belonging to a project, with a date, a duration and a status.
 
@@ -162,9 +188,11 @@ extension if a multi-project monthly overview becomes necessary.
 - **SC-003**: The timesheet for any month appears within 2 seconds of opening it or switching months.
 - **SC-004**: Pasting the copied month into a common spreadsheet tool produces exactly as many rows as the month has days, with date and hours in separate columns, without manual cleanup.
 - **SC-005**: The timesheet of any listed project is reachable from the main screen in 1 click.
+- **SC-006**: For any tested month, 100% of weekly subtotals equal the sum of the booked time of their seven days (including neighbouring-month days), so the operator can transfer one week without manual addition.
 
 ## Assumptions
 
+- Weeks start on Monday and end on Sunday (ISO 8601); weekly subtotals follow the selected display format (decimal or hours:minutes).
 - Single operator use (same as the existing dashboard); no additional authentication or per-user filtering is needed.
 - Time data comes from the already-synchronised time entries; no new connection to InvoiceNinja is required.
 - "Booked time" means completed time entries; the status rules match the burndown chart.

@@ -106,6 +106,41 @@
 
 ---
 
+## Phase 7: User Story 1 (Increment 2) — Weekly subtotals (Priority: P1)
+
+**Goal**: Group the timesheet by ISO week (Mon–Sun) with a subtotal row after each Sunday, including the trailing partial week; edge weeks cover the full week incl. neighbouring-month days, shown greyed and not copyable, labelled "incl. days from other month" (FR-017–FR-020, SC-006, US1 scenarios 6–8).
+
+**Independent Test**: September 2026 shows 5 subtotal rows (weeks 36–40, 31 Aug – 04 Oct), each equal to the sum of its 7 rows; 31 Aug and 01–04 Oct are greyed and not clickable; month Total, Copy month and CSV contain only the 30 September days (quickstart steps 13–17).
+
+**Context**: Phases 1–6 are implemented and merged. This phase only extends `api/src/services/timesheet.js`, its tests, `frontend/src/components/TimesheetModal.jsx` and `README.md`. The response change is additive — `days` and `total` keep their month-only meaning (research R10). Design: [research.md](research.md) R9–R12, [data-model.md](data-model.md) "WeeklySubtotal", [contracts/timesheet-api.md](contracts/timesheet-api.md), [contracts/timesheet-ui.md](contracts/timesheet-ui.md).
+
+### Tests for Increment 2
+
+> Write these first and ensure they FAIL before implementation
+
+- [X] T025 [P] [US1] Add tests to `api/tests/timesheet.test.js` for `weekRange(month)` and `isoWeek(date)`: `weekRange('2026-09')` → `{ from: '2026-08-31', to: '2026-10-05' }`; `weekRange('2026-08')` → `{ from: '2026-07-27', to: '2026-09-07' }`; `weekRange('2021-02')` → `{ from: '2021-02-01', to: '2021-03-01' }`; `isoWeek('2026-08-31')` → `{ week: 36, year: 2026 }`, `isoWeek('2026-12-28')` → `{ week: 53, year: 2026 }`, `isoWeek('2025-12-29')` → `{ week: 1, year: 2026 }`, `isoWeek('2021-01-03')` → `{ week: 53, year: 2020 }`
+- [X] T026 [P] [US1] Add tests to `api/tests/timesheet.test.js` for `buildWeeks(month, rows)`: Sep 2026 → 5 weeks, first `start: '2026-08-31'`, last `end: '2026-10-04'`, each with exactly 7 days Monday→Sunday; Aug 2026 → 6 weeks; Feb 2021 → 4 weeks all `spans_other_month: false`; rows `{2026-09-29: '2', 2026-10-02: '3'}` → last week `hours: 5`, `spans_other_month: true`, `days` for 01–04 Oct have `in_month: false`; week `hours` rounded to 2 decimals; every date appears in exactly one week
+- [X] T027 [P] [US1] Add a `getTimesheet` test to `api/tests/timesheet.test.js` using the mocked `query` (`vi.mocked(query)` with `mockResolvedValueOnce` for project, entries, sync_state): verify the entries query is called with `[projectId, '2026-08-31', '2026-10-05']` for `'2026-09'`; rows on `2026-08-31` and `2026-10-02` contribute to `weeks` but not to `days` or `total`; `days` still has 30 items
+
+### Implementation for Increment 2
+
+- [X] T028 [US1] In `api/src/services/timesheet.js` add exported pure helpers `weekRange(month)` (Monday on/before the 1st → `from`, Monday after the Sunday on/after the last day → `to`, half-open, UTC arithmetic) and `isoWeek(date)` (ISO 8601 Thursday rule, returns `{ week, year }`); make T025 pass
+- [X] T029 [US1] In `api/src/services/timesheet.js` add exported `buildWeeks(month, rows)`: iterate weeks from `weekRange(month).from` in 7-day steps until `to`; each week `{ week, year, start, end, hours, spans_other_month, days }` where `days` are 7 `{ date, weekday, hours, in_month }` (reuse the same row lookup/rounding as `buildMonthDays`; `in_month` = `date.startsWith(month)`), `hours` = round2(sum of the 7 unrounded values), `spans_other_month` = any `!in_month`; make T026 pass
+- [X] T030 [US1] Update `getTimesheet` in `api/src/services/timesheet.js`: query with `weekRange(month)` instead of the month bounds; compute `days` via `buildMonthDays(month, rows)` (already ignores out-of-month rows) and `total` from rows whose `date` starts with `month` only; add `weeks: buildWeeks(month, rows)` to the response; update the JSDoc return shape; make T027 pass and run `cd api && npm test` (all green)
+- [X] T031 [US1] Update `frontend/src/components/TimesheetModal.jsx` body: render `data.weeks` instead of `data.days`; for each week render its 7 day rows, then a subtotal row. Day rows with `in_month: false`: `opacity: 0.45`, `color: var(--muted)`, no weekend shading, value as plain `<span>` (no copy button, `aria-disabled="true"`). In-month rows keep the existing rendering (muted zeros, weekend shading, click-to-copy). Subtotal row: `background: var(--surface)`, `borderTop: 1px solid var(--border)`, fontSize 11 label `Week {week} · {DD MMM} – {DD MMM}` (`en-GB`, `day: '2-digit', month: 'short'`) with a second muted line "incl. days from other month" when `spans_other_month`, right-aligned bold `formatHours(week.hours, format)` with tabular numerals; not clickable
+- [X] T032 [US1] Verify in `frontend/src/components/TimesheetModal.jsx` that Total, `handleCopyMonth`, `handleDownload` and the "Copied N days" notice still use `data.days` / `data.total` only (FR-019, FR-020) and that subtotals use the current `format`; then run `cd frontend && npm run build`
+
+**Checkpoint**: Weekly subtotals work; Copy month / CSV unchanged. Validate quickstart steps 13–17.
+
+---
+
+## Phase 8: Polish (Increment 2)
+
+- [X] T033 [P] Update the "Timesheet" section in `README.md`: add a bullet that rows are grouped by ISO week (Mon–Sun) with a subtotal after each Sunday; edge weeks include greyed days of the neighbouring month and are marked "incl. days from other month"; subtotals are display-only (not in Copy month / CSV)
+- [ ] T034 Run `cd api && npm test` and `cd frontend && npm run build`; then validate quickstart steps 1–17 in the Docker stack (`docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build`), including December 2026 (week 53) and light/dark theme
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -116,6 +151,8 @@
 - **US2 (Phase 4)**: after US1 (extends `TimesheetModal.jsx` and needs fetched `days`)
 - **US3 (Phase 5)**: after US1; independent of US2, but T020 also wires `format` into US2's copy/download calls if US2 is done — if US3 ships before US2, T017/T018 must use `format` when they are implemented
 - **Polish (Phase 6)**: after the desired stories
+- **Increment 2 (Phase 7)**: depends on Phases 1–5 (already done); T025–T027 → T028 → T029 → T030 (same file chain); T031 needs T030's response shape (can be written in parallel against the contract) → T032
+- **Polish Inc. 2 (Phase 8)**: T033 any time after T030; T034 last
 
 ### Within User Story 1
 
@@ -130,6 +167,7 @@
 - US2: T015 ‖ T016, then T017 → T018
 - US3: T019 ‖ (US2 work) — different functions but same file; coordinate edits
 - Polish: T021 ‖ T022
+- Increment 2: T025 ‖ T026 ‖ T027 (tests, same file — coordinate or write in one go); T031 ‖ T028–T030 against the contract; T033 ‖ T031
 
 ## Parallel Example: User Story 1
 
@@ -154,3 +192,4 @@ Task: "T011 formatHours (decimal) in frontend/src/utils/timesheet.js"
 2. US2 → copy/download removes retyping (largest time saving, SC-001/SC-004)
 3. US3 → h:mm format for targets that need it
 4. Polish → README, accessibility, full quickstart validation; commit with `feat:` prefix per constitution
+5. Increment 2 (Phase 7–8) → weekly subtotals for the weekly transfer routine (SC-006); API first (T025–T030, independently testable via `curl … | jq '.weeks'`), then the modal (T031–T032); commit as `feat: weekly subtotals in timesheet`

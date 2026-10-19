@@ -20,9 +20,14 @@
 │ ‹  September 2026  ›         [ 1.75 | 1:45 ]           │
 │ Last synced: 18 Oct 2026, 09:30                        │
 ├────────────────────────────────────────────────────────┤
-│ Mon 01 Sep      2026-09-01            0.00             │  ← zero rows muted
-│ Tue 02 Sep      2026-09-02            2.50  [click=copy]│
-│ Sat 06 Sep      …                      …               │  ← weekend rows shaded
+│ Mon 31 Aug      2026-08-31            1.00             │  ← neighbouring month: greyed, no copy
+│ Tue 01 Sep      2026-09-01            0.00             │  ← zero rows muted
+│ Wed 02 Sep      2026-09-02            2.50  [click=copy]│
+│ Sat 05 Sep      …                      …               │  ← weekend rows shaded
+│ Sun 06 Sep      …                      …               │
+│ Week 36 · 31 Aug – 06 Sep                       7.50   │  ← subtotal row (display-only)
+│   incl. days from other month                          │
+│ Mon 07 Sep      …                                      │
 ├────────────────────────────────────────────────────────┤
 │ Total                                 6.50             │
 │                       [ Copy month ]  [ Download CSV ] │
@@ -40,6 +45,11 @@
 | "Copy month" → TSV `YYYY-MM-DD\t<value>` per line, no header; "Copied N days" feedback | FR-007 |
 | "Download CSV" → `timesheet_<slug>_<YYYY-MM>.csv`, BOM + `date,hours` header + one row per day | FR-008 |
 | Clipboard failure → inline message "Copy not available — use Download CSV" | Edge case |
+| Rows grouped by ISO week; a subtotal row follows each Sunday incl. the trailing partial week | FR-017 |
+| Subtotal = full Mon–Sun week incl. neighbouring-month days; label "Week N · DD MMM – DD MMM", plus "incl. days from other month" when `spans_other_month` | FR-018 |
+| Subtotal rows are not clickable and never part of Copy month / CSV | FR-019 |
+| Neighbouring-month day rows: greyed (`opacity` ≈ 0.45, `var(--muted)`), value not copyable, no weekend shading; excluded from Total, Copy month, CSV | FR-020 |
+| Subtotals follow the format toggle | Assumption |
 | Close via ✕, `Esc`, or backdrop click; dashboard state (selection, mode) unchanged | FR-015 |
 | Loading → "Loading…"; error → message + Retry | — |
 | Colours only via existing CSS variables (`--card`, `--border`, `--muted`, `--accent`, `--surface`, `--text`) | FR-014, Constitution V |

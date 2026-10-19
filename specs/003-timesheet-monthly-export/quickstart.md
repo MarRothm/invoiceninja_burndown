@@ -40,3 +40,14 @@ WHERE project_id = 1 AND status = 'completed' AND entry_date = '2026-09-03';
 10. Close via ✕, `Esc`, backdrop → dashboard unchanged.
 11. Over plain HTTP (non-localhost LAN IP), **Copy month** still works (execCommand fallback).
 12. Switch theme (light/dark) → overlay follows theme.
+
+### Weekly subtotals (increment 2)
+
+13. September 2026 → 5 subtotal rows (weeks 36–40); the first week starts Mon 31 Aug and the
+    last ends Sun 04 Oct; 31 Aug and 01–04 Oct rows are greyed and not clickable.
+14. Edge-week subtotal shows "incl. days from other month" and equals the sum of all 7 rows;
+    the month Total excludes the greyed rows.
+15. **Copy month** / **Download CSV** still contain exactly 30 rows, no subtotal or greyed rows.
+16. Toggle `1:45` → subtotals switch format too.
+17. December 2026 → last week (28 Dec – 03 Jan) is labelled Week 53; cross-check with
+    `curl … ?month=2026-12 | jq '.weeks[-1] | {week, year, hours}'`.
