@@ -102,3 +102,58 @@ the design questions that came up while mapping the spec onto the existing codeb
   Constitution V). Constitution testing policy targets `api/tests/`.
 - **Alternatives considered**: Add Vitest + RTL to the frontend — reasonable later, but a
   separate tooling change.
+
+---
+
+## Increment 2 — Weekly subtotals (2026-10-19)
+
+Inputs: spec Clarifications session 2026-10-19 (full-week subtotals, display-only, greyed
+neighbouring-month days), FR-017–FR-020, SC-006.
+
+## R9 — Where weekly subtotals are computed
+
+- **Decision**: In the API service (`buildWeeks` in `api/src/services/timesheet.js`), returned
+  as part of the existing timesheet response. The SQL range widens from the month to the full
+  weeks touching it: `from` = Monday on/before the 1st, `to` = Monday after the Sunday on/after
+  the last day (half-open). Still one grouped query on the existing partial index.
+- **Rationale**: Edge-week subtotals need neighbouring-month hours the frontend doesn't have;
+  computing in the service keeps aggregation in one layer (Constitution III) and makes it
+  unit-testable with Vitest (the frontend has no test runner, R8).
+- **Alternatives considered**:
+  - Frontend fetches the adjacent months and sums — up to 3 requests per view and summing
+    logic in an untested layer.
+  - Separate `/timesheet/weeks` endpoint — two requests for one view; no benefit.
+
+## R10 — Response shape (backward compatible)
+
+- **Decision**: Add a `weeks` array; keep `days` (month-only), `total` (month-only) and all
+  other fields unchanged. Each week: `{ week, year, start, end, hours, spans_other_month,
+  days: [{ date, weekday, hours, in_month }] }`.
+- **Rationale**: Purely additive — existing clients and the already-shipped Copy month / CSV
+  logic (built on `days`) keep working, which also guarantees FR-019/FR-020 (neighbouring
+  days never reach export or total). Nested days avoid recomputing week membership in the UI.
+- **Alternatives considered**: Replacing `days` with a 35–42-day `calendar` array plus
+  `in_month` — breaking change and forces the export code to filter.
+
+## R11 — Week numbering and boundaries
+
+- **Decision**: Weeks are ISO 8601 (Monday start); `week`/`year` are ISO week number and ISO
+  week-year (e.g. Mon 29 Dec 2025 → week 1 of 2026), computed with UTC arithmetic via the
+  Thursday rule. A month touches 4–6 weeks (Feb 2021: exactly 4; Aug 2026: 6).
+  `spans_other_month = days.some(d => !d.in_month)`; week `hours` = round2(sum of all 7 days).
+- **Rationale**: ISO weeks match European timesheet/ERP conventions (German "KW") and the
+  spec assumption "weeks start on Monday". UTC avoids DST shifts (same as R1).
+- **Alternatives considered**: Locale-dependent week start — ambiguous across target systems.
+
+## R12 — Rendering in the modal
+
+- **Decision**: Iterate `weeks`; per week render its days, then a subtotal row
+  ("Week 40 · 28 Sep – 04 Oct", plus "incl. days from other month" when
+  `spans_other_month`). Neighbouring-month rows: `opacity: 0.45`, `var(--muted)` text, value
+  as plain text (no copy button, `aria-disabled`). Subtotal row: `var(--surface)` background,
+  top border, bold value; not clickable (FR-019 display-only). Weekend shading stays for
+  in-month rows only.
+- **Rationale**: Keeps visual hierarchy (day < week < month) with existing CSS variables only
+  (Constitution V); "Week N" makes it easy to match the target system's weekly entry form.
+- **Alternatives considered**: Separate week summary table under the list — loses the
+  day ↔ week visual connection that makes edge weeks traceable (FR-020).

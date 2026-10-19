@@ -34,3 +34,4 @@
 - Iteration 1: 2 open [NEEDS CLARIFICATION] markers — GUI placement (spec "Chosen placement") and hours scope (FR-002). 
 - Iteration 2: Resolved — placement = Option C (overlay from project card/header), scope = selected project only. All items pass.
 - CSV / clipboard / ISO date are user-facing output formats, not implementation details.
+- Iteration 3 (2026-10-19, /speckit-clarify): weekly subtotals added (FR-017–FR-020, SC-006, US1 scenarios 6–8). Re-validated — all items still pass.

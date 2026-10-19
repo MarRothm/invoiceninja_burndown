@@ -2,7 +2,23 @@ import { query } from '../db/pool.js';
 
 const MONTH_RE = /^(\d{4})-(0[1-9]|1[0-2])$/;
 
+const DAY_MS = 86400000;
+
 const round2 = (n) => Math.round(n * 100) / 100;
+
+const toISODate = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+/** ISO weekday of a UTC timestamp: Monday = 1 … Sunday = 7 */
+const isoWeekday = (ms) => new Date(ms).getUTCDay() || 7;
+
+/** Lookup date → hours from grouped query rows */
+function hoursLookup(rows) {
+  const hoursByDate = {};
+  for (const row of rows) {
+    hoursByDate[row.date] = parseFloat(row.hours) || 0;
+  }
+  return hoursByDate;
+}
 
 /**
  * Validate a 'YYYY-MM' string (years 2000–2100).
@@ -29,10 +45,7 @@ export function parseMonth(raw) {
 export function buildMonthDays(month, rows) {
   const { year, month: mon } = parseMonth(month);
 
-  const hoursByDate = {};
-  for (const row of rows) {
-    hoursByDate[row.date] = parseFloat(row.hours) || 0;
-  }
+  const hoursByDate = hoursLookup(rows);
 
   const daysInMonth = new Date(Date.UTC(year, mon, 0)).getUTCDate();
   const days = [];
@@ -49,11 +62,69 @@ export function buildMonthDays(month, rows) {
 }
 
 /**
+ * Half-open date range [from, to) covering every Monday–Sunday week that touches `month`.
+ * from = Monday on/before the 1st, to = Monday after the Sunday on/after the last day.
+ */
+export function weekRange(month) {
+  const { year, month: mon } = parseMonth(month);
+  const first = Date.UTC(year, mon - 1, 1);
+  const last  = Date.UTC(year, mon, 0);
+  return {
+    from: toISODate(first - (isoWeekday(first) - 1) * DAY_MS),
+    to:   toISODate(last + (8 - isoWeekday(last)) * DAY_MS),
+  };
+}
+
+/**
+ * ISO 8601 week number and week-year of a 'YYYY-MM-DD' date (week containing Thursday).
+ */
+export function isoWeek(date) {
+  const ms       = Date.parse(`${date}T00:00:00Z`);
+  const thursday = new Date(ms + (4 - isoWeekday(ms)) * DAY_MS);
+  const year     = thursday.getUTCFullYear();
+  const week     = Math.floor((thursday - Date.UTC(year, 0, 1)) / (7 * DAY_MS)) + 1;
+  return { week, year };
+}
+
+/**
+ * Weekly subtotals for every Monday–Sunday week touching `month`, including
+ * neighbouring-month days (flagged in_month: false).
+ * Returns [ { week, year, start, end, hours, spans_other_month, days: [ { date, weekday, hours, in_month } ] } ]
+ */
+export function buildWeeks(month, rows) {
+  const { from, to } = weekRange(month);
+  const hoursByDate  = hoursLookup(rows);
+  const end          = Date.parse(`${to}T00:00:00Z`);
+
+  const weeks = [];
+  for (let monday = Date.parse(`${from}T00:00:00Z`); monday < end; monday += 7 * DAY_MS) {
+    const days = [];
+    let sum = 0;
+    for (let i = 0; i < 7; i++) {
+      const date  = toISODate(monday + i * DAY_MS);
+      const hours = hoursByDate[date] ?? 0;
+      sum += hours;
+      days.push({ date, weekday: i + 1, hours: round2(hours), in_month: date.startsWith(month) });
+    }
+    weeks.push({
+      ...isoWeek(days[0].date),
+      start:             days[0].date,
+      end:               days[6].date,
+      hours:             round2(sum),
+      spans_other_month: days.some(d => !d.in_month),
+      days,
+    });
+  }
+  return weeks;
+}
+
+/**
  * Daily totals of completed time entries for one project and month.
- * Returns { project, month, days, total, last_synced_at } or null if the project does not exist.
+ * days and total cover the month only; weeks cover full Monday–Sunday weeks touching it.
+ * Returns { project, month, days, total, weeks, last_synced_at } or null if the project does not exist.
  */
 export async function getTimesheet(projectId, month) {
-  const { from, to } = parseMonth(month);
+  const { from, to } = weekRange(month);
 
   const projRes = await query('SELECT id, name FROM projects WHERE id = $1', [projectId]);
   if (!projRes.rows.length) return null;
@@ -78,13 +149,18 @@ export async function getTimesheet(projectId, month) {
   const neverSynced = !lastSynced || new Date(lastSynced).getTime() <= 0;
 
   const days  = buildMonthDays(month, entriesRes.rows);
-  const total = round2(entriesRes.rows.reduce((sum, r) => sum + (parseFloat(r.hours) || 0), 0));
+  const total = round2(
+    entriesRes.rows
+      .filter(r => r.date.startsWith(month))
+      .reduce((sum, r) => sum + (parseFloat(r.hours) || 0), 0)
+  );
 
   return {
     project:        { id: project.id, name: project.name },
     month,
     days,
     total,
+    weeks:          buildWeeks(month, entriesRes.rows),
     last_synced_at: neverSynced ? null : new Date(lastSynced).toISOString(),
   };
 }

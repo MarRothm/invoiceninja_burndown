@@ -7,6 +7,9 @@ import {
 const FORMAT_KEY = 'burndown_timesheet_format';
 const COPY_FAILED = 'Copy not available — use Download CSV';
 
+const shortDate = (date) =>
+  new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+
 const actionButton = (disabled) => ({
   padding:    '8px 12px',
   background: 'var(--surface)',
@@ -217,48 +220,87 @@ export default function TimesheetModal({ project, onClose }) {
             </div>
           )}
 
-          {ready && data.days.map(day => {
-            const weekend = day.weekday >= 6;
-            const label   = new Date(`${day.date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' });
-            return (
-              <div
-                key={day.date}
-                style={{
-                  display:      'flex',
-                  alignItems:   'center',
-                  padding:      '5px 20px',
-                  fontSize:     12,
-                  background:   weekend ? 'var(--surface)' : 'transparent',
-                  borderBottom: '1px solid var(--border)',
-                  color:        day.hours === 0 ? 'var(--muted)' : 'var(--text)',
-                }}
-              >
-                <span style={{ width: 110 }}>{label}</span>
-                <span style={{ flex: 1, color: 'var(--muted)' }}>{day.date}</span>
-                {copiedDay === day.date && (
-                  <span style={{ fontSize: 11, color: 'var(--accent)', marginRight: 8 }}>Copied</span>
-                )}
-                <button
-                  onClick={() => handleCopyDay(day)}
-                  title="Copy value"
-                  style={{
-                    background:         'none',
-                    border:             'none',
-                    padding:            0,
-                    minWidth:           48,
-                    textAlign:          'right',
-                    fontSize:           12,
-                    fontWeight:         day.hours === 0 ? 400 : 600,
-                    fontVariantNumeric: 'tabular-nums',
-                    color:              'inherit',
-                    cursor:             'pointer',
-                  }}
-                >
-                  {formatHours(day.hours, format)}
-                </button>
+          {ready && data.weeks.map(week => (
+            <React.Fragment key={week.start}>
+              {week.days.map(day => {
+                const weekend = day.in_month && day.weekday >= 6;
+                const label   = new Date(`${day.date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' });
+                const value   = formatHours(day.hours, format);
+                return (
+                  <div
+                    key={day.date}
+                    style={{
+                      display:      'flex',
+                      alignItems:   'center',
+                      padding:      '5px 20px',
+                      fontSize:     12,
+                      background:   weekend ? 'var(--surface)' : 'transparent',
+                      borderBottom: '1px solid var(--border)',
+                      color:        !day.in_month || day.hours === 0 ? 'var(--muted)' : 'var(--text)',
+                      opacity:      day.in_month ? 1 : 0.45,
+                    }}
+                  >
+                    <span style={{ width: 110 }}>{label}</span>
+                    <span style={{ flex: 1, color: 'var(--muted)' }}>{day.date}</span>
+                    {copiedDay === day.date && (
+                      <span style={{ fontSize: 11, color: 'var(--accent)', marginRight: 8 }}>Copied</span>
+                    )}
+                    {day.in_month ? (
+                      <button
+                        onClick={() => handleCopyDay(day)}
+                        title="Copy value"
+                        style={{
+                          background:         'none',
+                          border:             'none',
+                          padding:            0,
+                          minWidth:           48,
+                          textAlign:          'right',
+                          fontSize:           12,
+                          fontWeight:         day.hours === 0 ? 400 : 600,
+                          fontVariantNumeric: 'tabular-nums',
+                          color:              'inherit',
+                          cursor:             'pointer',
+                        }}
+                      >
+                        {value}
+                      </button>
+                    ) : (
+                      // Neighbouring-month day: shown for the week subtotal only, not copyable
+                      <span
+                        aria-disabled="true"
+                        title="Other month — not included in this month"
+                        style={{ minWidth: 48, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                      >
+                        {value}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Weekly subtotal (display-only, full Monday–Sunday week) */}
+              <div style={{
+                display:      'flex',
+                alignItems:   'center',
+                padding:      '6px 20px',
+                background:   'var(--surface)',
+                borderTop:    '1px solid var(--border)',
+                borderBottom: '1px solid var(--border)',
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>
+                    Week {week.week} · {shortDate(week.start)} – {shortDate(week.end)}
+                  </div>
+                  {week.spans_other_month && (
+                    <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>incl. days from other month</div>
+                  )}
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--text)' }}>
+                  {formatHours(week.hours, format)}
+                </span>
               </div>
-            );
-          })}
+            </React.Fragment>
+          ))}
         </div>
 
         {/* Footer */}
