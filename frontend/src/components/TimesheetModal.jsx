@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { fetchTimesheet } from '../hooks/api.js';
 import {
-  currentMonth, shiftMonth, formatHours, toTSV, toCSV, fileName, copyText,
+  currentMonth, shiftMonth, formatHours, formatEUR, formatRate, toTSV, toCSV, fileName, copyText,
 } from '../utils/timesheet.js';
 
 const FORMAT_KEY = 'burndown_timesheet_format';
@@ -295,9 +295,12 @@ export default function TimesheetModal({ project, onClose }) {
                     <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>incl. days from other month</div>
                   )}
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--text)' }}>
-                  {formatHours(week.hours, format)}
-                </span>
+                <div style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+                    {formatHours(week.hours, format)}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{formatEUR(week.amount)}</div>
+                </div>
               </div>
             </React.Fragment>
           ))}
@@ -306,9 +309,20 @@ export default function TimesheetModal({ project, onClose }) {
         {/* Footer */}
         <div style={{ padding: '12px 20px 16px', borderTop: '1px solid var(--border)' }}>
           {ready && (
-            <div style={{ display: 'flex', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
-              <span style={{ flex: 1 }}>Total</span>
-              <span style={{ color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>{formatHours(data.total, format)}</span>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', fontSize: 13, fontWeight: 700 }}>
+                <span style={{ flex: 1 }}>Total</span>
+                <span style={{ color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>{formatHours(data.total, format)}</span>
+              </div>
+              {/* EUR equivalent at the InvoiceNinja task rate (display-only, not exported) */}
+              <div style={{ display: 'flex', alignItems: 'baseline', marginTop: 4 }}>
+                <span style={{ flex: 1, textAlign: 'right', fontSize: 11, color: 'var(--muted)', marginRight: 8 }}>
+                  {data.rate === null ? 'No hour rate set' : formatRate(data.rate)}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>
+                  {formatEUR(data.amount)}
+                </span>
+              </div>
             </div>
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

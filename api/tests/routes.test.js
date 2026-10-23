@@ -134,6 +134,31 @@ describe('GET /api/projects/:id/timesheet', () => {
     expect(getTimesheet).toHaveBeenLastCalledWith(1, '2026-09');
   });
 
+  it('passes rate and EUR amount through', async () => {
+    getTimesheet.mockResolvedValueOnce({
+      project: { id: 1, name: 'X' }, month: '2026-09', days: [], total: 37.5,
+      rate: 95, amount: 3562.5, weeks: [], last_synced_at: null,
+    });
+    const res  = await app.inject({ method: 'GET', url: '/api/projects/1/timesheet?month=2026-09' });
+    const body = JSON.parse(res.body);
+    expect(res.statusCode).toBe(200);
+    expect(body.rate).toBe(95);
+    expect(body.amount).toBe(3562.5);
+  });
+
+  it('keeps null amounts for projects without a rate', async () => {
+    getTimesheet.mockResolvedValueOnce({
+      project: { id: 1, name: 'X' }, month: '2026-09', days: [], total: 4,
+      rate: null, amount: null, weeks: [{ start: '2026-08-31', hours: 4, amount: null }], last_synced_at: null,
+    });
+    const res  = await app.inject({ method: 'GET', url: '/api/projects/1/timesheet?month=2026-09' });
+    const body = JSON.parse(res.body);
+    expect(body.total).toBe(4);
+    expect(body.rate).toBeNull();
+    expect(body.amount).toBeNull();
+    expect(body.weeks[0].amount).toBeNull();
+  });
+
   it('returns 404 when project not found', async () => {
     getTimesheet.mockResolvedValueOnce(null);
     const res = await app.inject({ method: 'GET', url: '/api/projects/9999/timesheet?month=2026-09' });

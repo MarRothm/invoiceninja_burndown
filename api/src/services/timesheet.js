@@ -38,6 +38,20 @@ export function parseMonth(raw) {
 }
 
 /**
+ * Hour rate from the synced InvoiceNinja `task_rate` (sent as 0 when unset).
+ * Returns a positive number, or null if missing, 0 or not numeric.
+ */
+export function parseRate(value) {
+  const rate = parseFloat(value);
+  return Number.isFinite(rate) && rate > 0 ? rate : null;
+}
+
+/** EUR amount of unrounded `hours` at `rate`, rounded to cents; null without a rate. */
+export function amountFor(hours, rate) {
+  return rate === null ? null : round2(hours * rate);
+}
+
+/**
  * Build one entry per calendar day of `month` ('YYYY-MM').
  * rows: [ { date: 'YYYY-MM-DD', hours } ] – days without a row get 0 hours.
  * Returns [ { date, weekday (ISO 1–7, Monday = 1), hours } ]
@@ -88,10 +102,10 @@ export function isoWeek(date) {
 
 /**
  * Weekly subtotals for every Monday–Sunday week touching `month`, including
- * neighbouring-month days (flagged in_month: false).
- * Returns [ { week, year, start, end, hours, spans_other_month, days: [ { date, weekday, hours, in_month } ] } ]
+ * neighbouring-month days (flagged in_month: false). amount is the week in EUR at `rate` (null without one).
+ * Returns [ { week, year, start, end, hours, amount, spans_other_month, days: [ { date, weekday, hours, in_month } ] } ]
  */
-export function buildWeeks(month, rows) {
+export function buildWeeks(month, rows, rate = null) {
   const { from, to } = weekRange(month);
   const hoursByDate  = hoursLookup(rows);
   const end          = Date.parse(`${to}T00:00:00Z`);
@@ -111,6 +125,7 @@ export function buildWeeks(month, rows) {
       start:             days[0].date,
       end:               days[6].date,
       hours:             round2(sum),
+      amount:            amountFor(sum, rate),
       spans_other_month: days.some(d => !d.in_month),
       days,
     });
@@ -121,14 +136,19 @@ export function buildWeeks(month, rows) {
 /**
  * Daily totals of completed time entries for one project and month.
  * days and total cover the month only; weeks cover full Monday–Sunday weeks touching it.
- * Returns { project, month, days, total, weeks, last_synced_at } or null if the project does not exist.
+ * rate is the project's InvoiceNinja task rate (null if unset); amount is total in EUR.
+ * Returns { project, month, days, total, rate, amount, weeks, last_synced_at } or null if the project does not exist.
  */
 export async function getTimesheet(projectId, month) {
   const { from, to } = weekRange(month);
 
-  const projRes = await query('SELECT id, name FROM projects WHERE id = $1', [projectId]);
+  const projRes = await query(
+    "SELECT id, name, raw->>'task_rate' AS task_rate FROM projects WHERE id = $1",
+    [projectId]
+  );
   if (!projRes.rows.length) return null;
   const project = projRes.rows[0];
+  const rate    = parseRate(project.task_rate);
 
   const entriesRes = await query(`
     SELECT entry_date::text AS date, SUM(hours) AS hours
@@ -148,19 +168,19 @@ export async function getTimesheet(projectId, month) {
   // sync_state defaults to the epoch until the first sync has run
   const neverSynced = !lastSynced || new Date(lastSynced).getTime() <= 0;
 
-  const days  = buildMonthDays(month, entriesRes.rows);
-  const total = round2(
-    entriesRes.rows
-      .filter(r => r.date.startsWith(month))
-      .reduce((sum, r) => sum + (parseFloat(r.hours) || 0), 0)
-  );
+  const days       = buildMonthDays(month, entriesRes.rows);
+  const monthHours = entriesRes.rows
+    .filter(r => r.date.startsWith(month))
+    .reduce((sum, r) => sum + (parseFloat(r.hours) || 0), 0);
 
   return {
     project:        { id: project.id, name: project.name },
     month,
     days,
-    total,
-    weeks:          buildWeeks(month, entriesRes.rows),
+    total:          round2(monthHours),
+    rate,
+    amount:         amountFor(monthHours, rate),
+    weeks:          buildWeeks(month, entriesRes.rows, rate),
     last_synced_at: neverSynced ? null : new Date(lastSynced).toISOString(),
   };
 }

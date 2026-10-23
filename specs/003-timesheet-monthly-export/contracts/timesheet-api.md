@@ -53,6 +53,9 @@ Read-only. Returns the daily totals of completed time entries for one project an
 month-only meaning. `weeks[].hours` includes neighbouring-month days, so `sum(weeks[].hours)`
 may exceed `total` (spec FR-018).
 
+`rate`, `amount` and `weeks[].amount` (EUR equivalents) were added by feature 004 — see
+[004 timesheet-api.md](../../004-timesheet-eur-amount/contracts/timesheet-api.md).
+
 Future months are **not** rejected (returns zeros); see research R2. Rate limit: global
 default (200/min) — no special config.
 

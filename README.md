@@ -121,6 +121,10 @@ hours into other systems (customer portals, time-tracking tools, spreadsheets).
 - **Copy month** copies tab-separated `date ⇥ hours` lines — paste into a spreadsheet as two columns.
   Click a single value to copy only that day.
 - **Download CSV** saves `timesheet_<project>_<YYYY-MM>.csv` (header `date,hours`, UTF-8).
+- The footer total and every weekly subtotal also show the **EUR equivalent** at the project's
+  **task rate** (set on the project in InvoiceNinja), e.g. `@ 95.00 €/h · 3,562.50 €`. Amounts are
+  net (no VAT), computed from unrounded hours and display-only — not part of Copy month or the
+  CSV. Projects without a task rate show `—` and "No hour rate set".
 - Toggle **1.75 / 1:45** for decimal hours or hours:minutes; the choice is remembered per browser.
 - Only completed time entries count (same rule as the burndown); data is as of the last sync.
 

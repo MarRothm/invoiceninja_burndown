@@ -4,7 +4,7 @@ vi.mock('../src/db/pool.js', () => ({ query: vi.fn() }));
 
 import { query } from '../src/db/pool.js';
 import {
-  buildMonthDays, buildWeeks, getTimesheet, isoWeek, parseMonth, weekRange,
+  amountFor, buildMonthDays, buildWeeks, getTimesheet, isoWeek, parseMonth, parseRate, weekRange,
 } from '../src/services/timesheet.js';
 
 // ── parseMonth ────────────────────────────────────────────────────────────
@@ -24,6 +24,36 @@ describe('parseMonth', () => {
       expect(parseMonth(raw)).toBeNull();
     }
   );
+});
+
+// ── parseRate / amountFor ─────────────────────────────────────────────────
+
+describe('parseRate', () => {
+  it.each([[95, 95], ['95.5', 95.5]])('accepts %j', (raw, expected) => {
+    expect(parseRate(raw)).toBe(expected);
+  });
+
+  it.each([0, '0', null, undefined, '', 'abc', -10])('treats %j as no rate', (raw) => {
+    expect(parseRate(raw)).toBeNull();
+  });
+});
+
+describe('amountFor', () => {
+  it('multiplies hours by rate', () => {
+    expect(amountFor(37.5, 95)).toBe(3562.5);
+  });
+
+  it('returns 0 for no hours when a rate exists', () => {
+    expect(amountFor(0, 95)).toBe(0);
+  });
+
+  it('returns null without a rate', () => {
+    expect(amountFor(10, null)).toBeNull();
+  });
+
+  it('rounds to cents', () => {
+    expect(amountFor(1 / 3, 100)).toBe(33.33);
+  });
 });
 
 // ── buildMonthDays ────────────────────────────────────────────────────────
@@ -136,6 +166,33 @@ describe('buildWeeks', () => {
     expect(weeks[1].hours).toBe(0.67);
   });
 
+  it('adds the EUR amount per week at the given rate', () => {
+    const weeks = buildWeeks('2026-09', [{ date: '2026-09-08', hours: '12.25' }], 80);
+    expect(weeks[1].amount).toBe(980);
+    expect(weeks[0].amount).toBe(0);
+  });
+
+  it('prices edge weeks for the full Monday–Sunday week', () => {
+    const weeks = buildWeeks('2026-09', [
+      { date: '2026-09-29', hours: '2' },
+      { date: '2026-10-02', hours: '3' },
+    ], 100);
+    expect(weeks[4].amount).toBe(500);
+  });
+
+  it('computes week amounts from unrounded hours', () => {
+    const weeks = buildWeeks('2026-09', [
+      { date: '2026-09-07', hours: 0.333 },
+      { date: '2026-09-08', hours: 0.333 },
+      { date: '2026-09-09', hours: 0.333 },
+    ], 100);
+    expect(weeks[1].amount).toBe(99.9);
+  });
+
+  it('has no amounts without a rate', () => {
+    expect(buildWeeks('2026-09', [{ date: '2026-09-08', hours: '1' }]).every(w => w.amount === null)).toBe(true);
+  });
+
   it('lists every date in exactly one week', () => {
     const dates = buildWeeks('2026-08', []).flatMap(w => w.days.map(d => d.date));
     expect(new Set(dates).size).toBe(dates.length);
@@ -165,5 +222,36 @@ describe('getTimesheet', () => {
     expect(t.weeks[0].hours).toBe(5);
     expect(t.weeks[4].hours).toBe(3);
     expect(t.last_synced_at).toBe('2026-10-18T07:30:00.000Z');
+  });
+
+  it('returns rate and EUR amounts from the project task rate', async () => {
+    vi.mocked(query)
+      .mockResolvedValueOnce({ rows: [{ id: 7, name: 'X', task_rate: '95' }] })
+      .mockResolvedValueOnce({ rows: [
+        { date: '2026-09-03', hours: '37.50' },
+        { date: '2026-10-02', hours: '1.00' },
+      ] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const t = await getTimesheet(7, '2026-09');
+
+    expect(t.rate).toBe(95);
+    expect(t.amount).toBe(3562.5);
+    expect(t.weeks[0].amount).toBe(3562.5);
+    expect(t.weeks[4].amount).toBe(95);
+  });
+
+  it('returns null amounts when the project has no task rate', async () => {
+    vi.mocked(query)
+      .mockResolvedValueOnce({ rows: [{ id: 7, name: 'X', task_rate: '0' }] })
+      .mockResolvedValueOnce({ rows: [{ date: '2026-09-03', hours: '4.00' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const t = await getTimesheet(7, '2026-09');
+
+    expect(t.total).toBe(4);
+    expect(t.rate).toBeNull();
+    expect(t.amount).toBeNull();
+    expect(t.weeks.every(w => w.amount === null)).toBe(true);
   });
 });
