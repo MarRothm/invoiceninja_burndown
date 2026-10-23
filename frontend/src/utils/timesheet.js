@@ -24,6 +24,17 @@ export function formatHours(hours, format = 'decimal') {
   return Number(hours).toFixed(2);
 }
 
+/** 3562.5 → '3,562.50 €', null → '—' (independent of the hours format) */
+export function formatEUR(amount) {
+  if (amount === null || amount === undefined) return '—';
+  return `${Number(amount).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+}
+
+/** 95 → '@ 95.00 €/h' */
+export function formatRate(rate) {
+  return `@ ${formatEUR(rate)}/h`;
+}
+
 /** Month as tab-separated lines (date, hours) — pastes into spreadsheets as two columns. */
 export function toTSV(days, format) {
   return days.map(d => `${d.date}\t${formatHours(d.hours, format)}`).join('\n');
