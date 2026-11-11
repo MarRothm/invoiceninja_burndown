@@ -5,6 +5,8 @@ import ThemeSelector from './components/ThemeSelector.jsx';
 import DashboardToggle from './components/DashboardToggle.jsx';
 import AIDashboard from './components/ai/AIDashboard.jsx';
 import TimesheetModal from './components/TimesheetModal.jsx';
+import ProjectTurnover from './components/ProjectTurnover.jsx';
+import TurnoverOverview from './components/TurnoverOverview.jsx';
 import { fetchProjects, fetchBurndown, triggerSync, fetchAIStatus } from './hooks/api.js';
 import { useTheme } from './hooks/useTheme.js';
 
@@ -34,6 +36,8 @@ export default function App() {
   const [aiReloadKey,  setAiReloadKey]  = useState(0);
   const [timesheetProject, setTimesheetProject] = useState(null);
   const closeTimesheet = useCallback(() => setTimesheetProject(null), []);
+  const [view,         setView]         = useState('dashboard');
+  const [turnoverKey,  setTurnoverKey]  = useState(0);
 
   const loadProjects = useCallback(async () => {
     try {
@@ -62,6 +66,14 @@ export default function App() {
     localStorage.setItem('burndown_dashboard_mode', mode);
   };
 
+  // Overview row click: show that project's detail view (legacy mode only has one)
+  const openProjectFromTurnover = (projectId) => {
+    const project = projects.find(p => p.id === projectId);
+    if (project) setSelected(project);
+    setView('dashboard');
+    if (dashMode === 'ai') handleToggle('legacy');
+  };
+
   useEffect(() => {
     if (!selected) return;
     setChartLoad(true);
@@ -78,6 +90,7 @@ export default function App() {
       await triggerSync();
       await loadProjects();
       setAiReloadKey(k => k + 1);
+      setTurnoverKey(k => k + 1);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -132,6 +145,25 @@ export default function App() {
           {syncing ? '↻ Syncing...' : '↻ Sync now'}
         </button>
 
+        {/* Turnover overview */}
+        <button
+          onClick={() => setView(v => (v === 'turnover' ? 'dashboard' : 'turnover'))}
+          aria-pressed={view === 'turnover'}
+          style={{
+            width: '100%',
+            padding: '8px 12px',
+            background: 'var(--surface)',
+            border: `1px solid ${view === 'turnover' ? 'var(--accent)' : 'var(--border)'}`,
+            borderRadius: 4,
+            color: 'var(--accent)',
+            fontSize: 12,
+            marginBottom: 8,
+            transition: 'opacity 0.15s ease-in-out',
+          }}
+        >
+          € Turnover
+        </button>
+
         {/* Project list */}
         {loading && <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 24 }}>Loading...</div>}
         {projects.map(p => (
@@ -139,7 +171,7 @@ export default function App() {
             key={p.id}
             project={p}
             selected={selected?.id === p.id}
-            onClick={() => setSelected(p)}
+            onClick={() => { setSelected(p); setView('dashboard'); }}
             onOpenTimesheet={() => setTimesheetProject(p)}
           />
         ))}
@@ -151,13 +183,18 @@ export default function App() {
       {/* ── Main ── */}
       <main style={{ flex: 1, padding: '32px 36px', overflowY: 'auto' }}>
 
+        {/* Turnover overview */}
+        {view === 'turnover' && (
+          <TurnoverOverview reloadKey={turnoverKey} onSelectProject={openProjectFromTurnover} />
+        )}
+
         {/* AI Dashboard view */}
-        {dashMode === 'ai' && (
+        {view === 'dashboard' && dashMode === 'ai' && (
           <AIDashboard key={aiReloadKey} theme={theme} ollamaStatus={aiStatus.ollama} />
         )}
 
         {/* Legacy Dashboard view */}
-        {dashMode !== 'ai' && (<>
+        {view === 'dashboard' && dashMode !== 'ai' && (<>
 
         {error && (
           <div style={{ background: 'rgba(218,72,48,0.08)', border: '1px solid var(--danger)', borderRadius: 4, padding: '12px 16px', fontSize: 12, color: 'var(--danger)', marginBottom: 20 }}>
@@ -256,6 +293,8 @@ export default function App() {
               <span><span style={{ color: 'var(--accent3)' }}>──</span> Ideal</span>
               <span><span style={{ color: 'var(--accent)' }}>──</span> Actual</span>
             </div>
+
+            <ProjectTurnover projectId={selected.id} reloadKey={turnoverKey} />
           </>
         )}
         </>)} {/* end legacy view */}

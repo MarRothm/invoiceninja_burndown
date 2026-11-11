@@ -19,6 +19,18 @@ export async function fetchTimesheet(projectId, month) {
   return res.json();
 }
 
+export async function fetchProjectTurnover(projectId) {
+  const res = await fetch(`${BASE}/projects/${projectId}/turnover`);
+  if (!res.ok) throw new Error('Failed to fetch turnover');
+  return res.json();
+}
+
+export async function fetchTurnover(year) {
+  const res = await fetch(`${BASE}/turnover?year=${encodeURIComponent(year)}`);
+  if (!res.ok) throw new Error('Failed to fetch turnover');
+  return res.json();
+}
+
 export async function triggerSync() {
   const res = await fetch(`${BASE}/sync`, { method: 'POST' });
   if (!res.ok) throw new Error('Sync failed');

@@ -12,7 +12,15 @@ vi.mock('../src/services/timesheet.js', async (importActual) => ({
 }));
 
 vi.mock('../src/services/sync.js', () => ({
-  runFullSync: vi.fn(async () => ({ projects: 0, entries: 0, ms: 1 })),
+  runFullSync: vi.fn(async () => ({ projects: 0, entries: 0, invoices: 0, ms: 1 })),
+}));
+
+vi.mock('../src/services/turnover.js', async (importActual) => ({
+  parseYear:          (await importActual()).parseYear,
+  getProjectTurnover: vi.fn(async () => null),
+  getYearTurnover:    vi.fn(async (year) => ({
+    year, years_available: [], projects: [], total: { invoiced: 0, paid: 0, open: 0, invoice_count: 0 }, last_synced_at: null,
+  })),
 }));
 
 // ── Build a minimal Fastify app (without DB / dotenv) ─────────────────────
@@ -24,6 +32,7 @@ import { projectRoutes } from '../src/routes/projects.js';
 import { getBurndown, listProjectsWithStats } from '../src/services/burndown.js';
 import { runFullSync } from '../src/services/sync.js';
 import { getTimesheet } from '../src/services/timesheet.js';
+import { getProjectTurnover, getYearTurnover } from '../src/services/turnover.js';
 
 async function buildApp() {
   const app = Fastify({ logger: false });
@@ -186,11 +195,53 @@ describe('GET /api/projects/:id/timesheet', () => {
 
 // ── POST /sync ────────────────────────────────────────────────────────────
 
+describe('GET /api/projects/:id/turnover', () => {
+  it('returns 200 with turnover data', async () => {
+    getProjectTurnover.mockResolvedValueOnce({
+      project: { id: 1, name: 'X' },
+      years: [{ year: 2026, invoiced: 2500, paid: 1500, open: 1000, invoice_count: 1 }],
+      total: { invoiced: 2500, paid: 1500, open: 1000, invoice_count: 1 },
+      last_synced_at: null,
+    });
+    const res = await app.inject({ method: 'GET', url: '/api/projects/1/turnover' });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).years[0].open).toBe(1000);
+    expect(getProjectTurnover).toHaveBeenLastCalledWith(1);
+  });
+
+  it('returns 404 when project not found', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/projects/9999/turnover' });
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body).error).toBe('Project not found');
+  });
+
+  it('returns 400 for invalid id', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/projects/abc/turnover' });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+describe('GET /api/turnover', () => {
+  it('returns 200 and passes the year as a number', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/turnover?year=2026' });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).year).toBe(2026);
+    expect(getYearTurnover).toHaveBeenLastCalledWith(2026);
+  });
+
+  it.each(['?year=26', '?year=abcd', ''])('returns 400 for %j', async (qs) => {
+    const res = await app.inject({ method: 'GET', url: `/api/turnover${qs}` });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe('Invalid year, expected YYYY');
+  });
+});
+
 describe('POST /api/sync', () => {
   it('returns 200 with ok:true on successful sync', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/sync' });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).ok).toBe(true);
+    expect(JSON.parse(res.body).invoices).toBe(0);
   });
 
   it('returns error when sync throws', async () => {

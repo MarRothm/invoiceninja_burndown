@@ -22,7 +22,9 @@ authentication and access controls in front of it.
 
 Known accepted risks in a local-only deployment:
 - The API has no built-in authentication (by design — it trusts the network boundary)
-- All project data from InvoiceNinja is accessible to anyone who can reach the API port
+- All project data from InvoiceNinja is accessible to anyone who can reach the API port —
+  including invoiced, paid and open amounts per project and year (turnover endpoints), so the
+  network boundary matters even more
 
 If you run this on a public-facing server, add authentication (e.g. HTTP Basic Auth via
 your reverse proxy, or a VPN/firewall rule) in front of the service.

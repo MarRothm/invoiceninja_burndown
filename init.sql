@@ -48,5 +48,26 @@ CREATE TABLE IF NOT EXISTS sync_state (
 );
 
 INSERT INTO sync_state (resource)
-VALUES ('projects'), ('time_entries')
+VALUES ('projects'), ('time_entries'), ('invoices')
 ON CONFLICT DO NOTHING;
+
+-- Invoices for yearly turnover (keep in sync with api/src/db/schema.js)
+CREATE TABLE IF NOT EXISTS invoices (
+  id                  SERIAL PRIMARY KEY,
+  invoiceninja_id     VARCHAR(50) UNIQUE NOT NULL,
+  project_id          INT REFERENCES projects(id) ON DELETE SET NULL,
+  number              VARCHAR(100),
+  invoice_date        DATE,
+  amount              NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  paid_to_date        NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  status_id           SMALLINT NOT NULL,
+  is_deleted          BOOLEAN NOT NULL DEFAULT false,
+  raw                 JSONB,
+  synced_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Counted invoices: not deleted, status sent / partial / paid
+CREATE INDEX IF NOT EXISTS idx_invoices_project_date
+  ON invoices (project_id, invoice_date)
+  WHERE NOT is_deleted AND status_id IN (2, 3, 4);

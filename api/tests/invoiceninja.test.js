@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { expandTimeEntries } from '../src/services/invoiceninja.js';
+import { expandTimeEntries, mapInvoice } from '../src/services/invoiceninja.js';
 
 describe('expandTimeEntries', () => {
   const baseTask = { id: 'task-1', project_id: 'proj-1' };
@@ -106,5 +106,43 @@ describe('expandTimeEntries', () => {
     const task  = { ...baseTask, time_log: [null, [start, end], 'bad'] };
     const entries = expandTimeEntries(task);
     expect(entries).toHaveLength(1);
+  });
+});
+
+describe('mapInvoice', () => {
+  const inv = {
+    id: 'inv-1', project_id: 'proj-1', number: '0042', date: '2026-02-10',
+    amount: 2500, paid_to_date: 1500, status_id: '3', is_deleted: false,
+  };
+
+  it('maps a full invoice', () => {
+    expect(mapInvoice(inv)).toEqual({
+      invoiceninja_id: 'inv-1', invoiceninja_project_id: 'proj-1', number: '0042',
+      invoice_date: '2026-02-10', amount: 2500, paid_to_date: 1500, status_id: 3, is_deleted: false,
+    });
+  });
+
+  it('parses string status_id to a number', () => {
+    expect(mapInvoice({ ...inv, status_id: '4' }).status_id).toBe(4);
+  });
+
+  it('defaults a missing status_id to draft', () => {
+    expect(mapInvoice({ ...inv, status_id: undefined }).status_id).toBe(1);
+  });
+
+  it('turns empty date and project into null', () => {
+    const row = mapInvoice({ ...inv, date: '', project_id: '' });
+    expect(row.invoice_date).toBeNull();
+    expect(row.invoiceninja_project_id).toBeNull();
+  });
+
+  it('parses numeric strings for amounts', () => {
+    const row = mapInvoice({ ...inv, amount: '1234.56', paid_to_date: '100.10' });
+    expect(row.amount).toBe(1234.56);
+    expect(row.paid_to_date).toBe(100.1);
+  });
+
+  it('keeps is_deleted', () => {
+    expect(mapInvoice({ ...inv, is_deleted: true }).is_deleted).toBe(true);
   });
 });
