@@ -64,7 +64,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 InvoiceNinja API
       │
       ▼
-  Sync Worker (Node.js)   ← runs every N minutes
+  Sync Worker (Node.js)   ← runs every N minutes (projects, tasks, invoices)
       │
       ▼
   PostgreSQL  ←→  Redis (Cache)
@@ -97,7 +97,9 @@ GET  /api/health                    → Status
 GET  /api/projects                  → All projects with stats
 GET  /api/projects/:id/burndown     → Burndown data for a project
 GET  /api/projects/:id/timesheet?month=YYYY-MM → Daily totals of completed hours for one month
-POST /api/sync                      → Trigger manual sync
+GET  /api/projects/:id/turnover     → Invoiced / paid / open per invoice year for a project
+GET  /api/turnover?year=YYYY        → Invoiced / paid / open per project for one year
+POST /api/sync                      → Trigger manual sync (returns projects, entries, invoices counts)
 GET  /api/ai-dashboard              → AI-generated dashboard layout (SSE stream)
 GET  /api/ai-dashboard/status       → Ollama availability + model status
 GET  /api/ai-dashboard/config       → Parsed thresholds from declaration (used by frontend)
@@ -127,6 +129,25 @@ hours into other systems (customer portals, time-tracking tools, spreadsheets).
   CSV. Projects without a task rate show `—` and "No hour rate set".
 - Toggle **1.75 / 1:45** for decimal hours or hours:minutes; the choice is remembered per browser.
 - Only completed time entries count (same rule as the burndown); data is as of the last sync.
+
+## Turnover
+
+Invoices are synced from InvoiceNinja alongside projects and tasks, to show turnover per project
+and calendar year.
+
+- The project detail view (legacy mode) has a **Turnover** table: one row per invoice year,
+  newest first, with **Invoiced**, **Paid** and **Open**, plus a total row. Projects without
+  invoices show "No invoices yet".
+- **€ Turnover** in the sidebar (legacy and AI mode) opens an overview of all projects for one
+  year (‹ / › to change year), sorted by invoiced amount with a total row. Click a project to
+  open its detail view.
+- Amounts are **gross** (incl. VAT). Payments count in the **year of the invoice** they pay
+  (InvoiceNinja's "paid to date", net of refunds; applied credits count as paid), so
+  Paid + Open = Invoiced for every year.
+- Counted: invoices with status sent, partial or paid, including archived ones. Not counted:
+  drafts, cancelled, reversed and deleted invoices, and invoices without a project.
+- The `invoices` table is created automatically when the API or worker starts, also on existing
+  databases. The first sync after upgrading fetches all invoices.
 
 ## AI Dashboard
 

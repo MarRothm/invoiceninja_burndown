@@ -1,5 +1,6 @@
 import { listProjectsWithStats, getBurndown } from '../services/burndown.js';
 import { getTimesheet, parseMonth } from '../services/timesheet.js';
+import { getProjectTurnover, getYearTurnover, parseYear } from '../services/turnover.js';
 import { runFullSync } from '../services/sync.js';
 import { invalidateAICache } from '../services/ai-dashboard.js';
 
@@ -41,6 +42,23 @@ export async function projectRoutes(fastify) {
     const data = await getTimesheet(id, req.query.month);
     if (!data) return reply.status(404).send({ error: 'Project not found' });
     return data;
+  });
+
+  // GET /projects/:id/turnover – invoiced / paid / open per invoice year
+  fastify.get('/projects/:id/turnover', async (req, reply) => {
+    const id = parseId(req.params.id);
+    if (id === null) return reply.status(400).send({ error: 'Invalid project id' });
+
+    const data = await getProjectTurnover(id);
+    if (!data) return reply.status(404).send({ error: 'Project not found' });
+    return data;
+  });
+
+  // GET /turnover?year=YYYY – invoiced / paid / open per project for one year
+  fastify.get('/turnover', async (req, reply) => {
+    const year = parseYear(req.query.year);
+    if (year === null) return reply.status(400).send({ error: 'Invalid year, expected YYYY' });
+    return getYearTurnover(year);
   });
 
   // POST /sync – trigger manual sync (strict rate limit: 5 per minute)

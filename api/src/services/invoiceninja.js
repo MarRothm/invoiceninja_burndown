@@ -54,6 +54,50 @@ export async function fetchTasks(updatedAfter) {
 }
 
 /**
+ * Fetch all invoices updated after a given ISO timestamp, including archived and deleted ones
+ * (list endpoints return active records only by default, so deletions would never sync).
+ */
+export async function fetchInvoices(updatedAfter) {
+  const perPage = 500;
+  const baseParams = {
+    updated_at: updatedAfter ? Math.floor(new Date(updatedAfter).getTime() / 1000) : undefined,
+    per_page: perPage,
+    status: 'active,archived,deleted',
+  };
+
+  const all = [];
+  let page = 1;
+
+  while (true) {
+    const data = await apiFetch('/invoices', { ...baseParams, page });
+    const records = data.data ?? [];
+    all.push(...records);
+
+    if (records.length < perPage) break;
+    page++;
+  }
+
+  return all;
+}
+
+/**
+ * Map an InvoiceNinja invoice to the columns of the invoices table.
+ * status_id arrives as a string ('1' draft … '6' reversed); empty date / project become null.
+ */
+export function mapInvoice(inv) {
+  return {
+    invoiceninja_id:         inv.id,
+    invoiceninja_project_id: inv.project_id || null,
+    number:                  inv.number || null,
+    invoice_date:            inv.date || null,
+    amount:                  parseFloat(inv.amount) || 0,
+    paid_to_date:            parseFloat(inv.paid_to_date) || 0,
+    status_id:               parseInt(inv.status_id, 10) || 1,
+    is_deleted:              !!inv.is_deleted,
+  };
+}
+
+/**
  * Expand InvoiceNinja task time_log into individual time entry records.
  * time_log is an array of [start_unix, end_unix] pairs.
  * Only entries where end > 0 (completed) and hours > 0 are included.

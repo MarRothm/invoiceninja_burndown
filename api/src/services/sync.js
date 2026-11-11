@@ -1,5 +1,5 @@
 import { query, getClient } from '../db/pool.js';
-import { fetchProjects, fetchTasks, expandTimeEntries } from './invoiceninja.js';
+import { fetchProjects, fetchTasks, fetchInvoices, mapInvoice, expandTimeEntries } from './invoiceninja.js';
 
 async function getLastSynced(resource) {
   const res = await query('SELECT last_synced_at FROM sync_state WHERE resource = $1', [resource]);
@@ -93,13 +93,65 @@ export async function syncTimeEntries() {
   return count;
 }
 
+export async function syncInvoices() {
+  const since = await getLastSynced('invoices');
+  const now   = new Date().toISOString();
+  console.log(`[sync] invoices since ${since ?? 'beginning'}`);
+
+  const invoices = await fetchInvoices(since);
+  console.log(`[sync] ${invoices.length} invoices fetched`);
+
+  for (const inv of invoices) {
+    const row = mapInvoice(inv);
+    // Resolve internal project id; invoices without a known project are stored but never counted
+    let projectId = null;
+    if (row.invoiceninja_project_id) {
+      const projRes = await query(
+        'SELECT id FROM projects WHERE invoiceninja_id = $1',
+        [row.invoiceninja_project_id]
+      );
+      projectId = projRes.rows[0]?.id ?? null;
+    }
+
+    await query(`
+      INSERT INTO invoices (invoiceninja_id, project_id, number, invoice_date, amount, paid_to_date, status_id, is_deleted, raw, synced_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+      ON CONFLICT (invoiceninja_id) DO UPDATE SET
+        project_id   = EXCLUDED.project_id,
+        number       = EXCLUDED.number,
+        invoice_date = EXCLUDED.invoice_date,
+        amount       = EXCLUDED.amount,
+        paid_to_date = EXCLUDED.paid_to_date,
+        status_id    = EXCLUDED.status_id,
+        is_deleted   = EXCLUDED.is_deleted,
+        raw          = EXCLUDED.raw,
+        synced_at    = NOW(),
+        updated_at   = NOW()
+    `, [
+      row.invoiceninja_id,
+      projectId,
+      row.number,
+      row.invoice_date,
+      row.amount,
+      row.paid_to_date,
+      row.status_id,
+      row.is_deleted,
+      JSON.stringify(inv),
+    ]);
+  }
+
+  await setLastSynced('invoices', now);
+  return invoices.length;
+}
+
 export async function runFullSync() {
   const t0 = Date.now();
   try {
     const projects = await syncProjects();
     const entries  = await syncTimeEntries();
-    console.log(`[sync] done in ${Date.now() - t0}ms — ${projects} projects, ${entries} entries`);
-    return { projects, entries, ms: Date.now() - t0 };
+    const invoices = await syncInvoices();
+    console.log(`[sync] done in ${Date.now() - t0}ms — ${projects} projects, ${entries} entries, ${invoices} invoices`);
+    return { projects, entries, invoices, ms: Date.now() - t0 };
   } catch (err) {
     console.error('[sync] error:', err.message);
     throw err;
