@@ -31,14 +31,6 @@ jobs:
           push: true
           tags: ghcr.io/marrothm/burndown-postgres:latest
 
-      - name: Build and push burndown-ollama
-        uses: docker/build-push-action@v5
-        with:
-          context: ./ollama
-          file: ollama/Dockerfile
-          push: true
-          tags: ghcr.io/marrothm/burndown-ollama:latest
-
       - name: Build and push burndown-api
         uses: docker/build-push-action@v5
         with:

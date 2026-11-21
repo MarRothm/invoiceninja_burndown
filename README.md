@@ -5,14 +5,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Project burndowns from InvoiceNinja — as a self-hosted Portainer stack.
-Includes an optional AI-generated dashboard powered by a local Ollama model.
+Includes an optional AI-generated dashboard powered by the Ollama instance running on the Docker host.
 
 ## Prerequisites
 
 - Docker + Docker Compose (or Portainer)
 - Running InvoiceNinja instance with API access
 - InvoiceNinja project **Custom Field 2** configured as a date field — used to store the project cancellation/early-end date
-- ~8 GB free RAM on the host if using the AI dashboard (for `qwen2.5:7b` via Ollama)
+- (Optional, for the AI dashboard) [Ollama](https://ollama.com) running on the Docker host with the model installed:
+  `ollama pull qwen2.5:7b` (~4.7 GB, ~8 GB free RAM). The stack does not bundle or pull a model.
 - (Optional) Traefik with `traefik_proxy` network for HTTPS
 
 ## Quick Start
@@ -27,7 +28,8 @@ Portainer runs on the local network only and is not reachable from GitHub. After
 image build, redeploy manually in Portainer: **Stacks → burndown → Update the stack** with
 **Re-pull image and redeploy** enabled.
 
-On first start, Ollama pulls `qwen2.5:7b` (~5 GB). Subsequent starts are instant.
+For the AI dashboard, run `ollama pull qwen2.5:7b` on the Docker host **before** redeploying
+(see [Host Ollama](#host-ollama)).
 
 ### Local development
 
@@ -38,7 +40,7 @@ cp .env.example .env
 
 # 2. Build and start from local source (uses docker-compose.dev.yml overlay)
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
-# → first run: Ollama pulls qwen2.5:7b (~5 GB); subsequent starts are instant
+# → AI dashboard needs Ollama on this machine with qwen2.5:7b (ollama pull qwen2.5:7b)
 
 # 3. Open browser
 # http://localhost:6088  (or your domain)
@@ -55,8 +57,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 | `SYNC_INTERVAL_MINUTES`  | —        | Sync interval in minutes (default: `10`)                 |
 | `POSTGRES_DB`            | —        | DB name (default: `burndown`)                            |
 | `POSTGRES_USER`          | —        | DB user (default: `burndown`)                            |
-| `OLLAMA_URL`             | —        | Ollama base URL (default: `http://ollama:11434`); override to use a shared external Ollama instance |
-| `OLLAMA_MODEL`           | —        | Model for AI dashboard generation (default: `qwen2.5:7b`) |
+| `OLLAMA_URL`             | —        | Host Ollama base URL (default: `http://host.docker.internal:11434`); example override: `http://macmini.local:11434` |
+| `OLLAMA_MODEL`           | —        | Model for AI dashboard generation (default: `qwen2.5:7b`); must be installed on the host Ollama |
 
 ## Architecture
 
@@ -70,7 +72,7 @@ InvoiceNinja API
   PostgreSQL  ←→  Redis (Cache)
       │
       ▼
-  API (Fastify)  ←──────────────  Ollama (qwen2.5:7b)
+  API (Fastify)  ←──────────────  Host Ollama (qwen2.5:7b, outside the stack)
       │                                   ▲
       ▼                           api/dashboard.declaration.md
   Frontend (React + Recharts)
@@ -88,7 +90,6 @@ InvoiceNinja API
 | `api`      | REST API (Fastify, port 3000 internal)                     |
 | `worker`   | Sync worker (InvoiceNinja → PostgreSQL)                    |
 | `frontend` | React SPA via Nginx (port 80)                              |
-| `ollama`   | Local AI runtime — serves `qwen2.5:7b` for AI dashboard generation (port 11434 internal only) |
 
 ## API Endpoints
 
@@ -101,7 +102,7 @@ GET  /api/projects/:id/turnover     → Invoiced / paid / open per invoice year 
 GET  /api/turnover?year=YYYY        → Invoiced / paid / open per project for one year
 POST /api/sync                      → Trigger manual sync (returns projects, entries, invoices counts)
 GET  /api/ai-dashboard              → AI-generated dashboard layout (SSE stream)
-GET  /api/ai-dashboard/status       → Ollama availability + model status
+GET  /api/ai-dashboard/status       → Host Ollama status: ready | model_missing | unavailable
 GET  /api/ai-dashboard/config       → Parsed thresholds from declaration (used by frontend)
 PUT  /api/ai-dashboard/declaration  → Update declaration at runtime (body: { content: "…" })
 GET  /api/ai-dashboard/debug        → Full AI diagnostic (Ollama status, declaration, projects)
@@ -152,13 +153,14 @@ and calendar year.
 ## AI Dashboard
 
 The AI dashboard generates a live project overview from a plain-language declaration
-file, streamed token-by-token from a local Ollama model.
+file, streamed token-by-token from the Ollama instance on the Docker host.
 
 ### Switching Views
 
 A toggle in the navigation bar switches between the **legacy dashboard** (default) and
 the **AI-generated dashboard**. Your preference is remembered across page reloads.
-The toggle is disabled when Ollama is unavailable or the model is still being pulled.
+The toggle is disabled when the host Ollama is unreachable or the configured model is not
+installed on it (the UI then shows the `ollama pull <model>` command to run on the host).
 
 ### Customising the Layout
 
@@ -203,17 +205,45 @@ root   = Dashboard([card1, chart1])
 | `BurndownChart(projectId)` | project ID (number) | Ideal vs. actual burndown line chart |
 | `StatusBadge` | — | Embedded inside ProjectCard; thresholds set by declaration |
 
-### Sharing Ollama with Other Projects
+### Host Ollama
 
-If another project (e.g. Monatsabschluss) also runs Ollama on the same host, point both
-stacks at a single shared Ollama container to avoid pulling the model twice:
+The stack does not bundle an AI runtime. The `api` service talks to the Ollama that already
+runs on the Docker host (shared with any other project on that machine), via
+`http://host.docker.internal:11434`:
 
-```dotenv
-# .env
-OLLAMA_URL=http://host-gateway:11434
+- On macOS (Docker Desktop / OrbStack) `host.docker.internal` reaches the Mac directly, even
+  if Ollama listens on loopback only.
+- On Linux Docker Engine (≥ 20.10) the `extra_hosts: host.docker.internal:host-gateway` entry
+  on the `api` service provides the name; Ollama must then listen on an address reachable
+  from the Docker bridge (`OLLAMA_HOST`).
+
+Host prerequisites:
+
+```bash
+ollama pull qwen2.5:7b             # or your OLLAMA_MODEL — the stack never pulls models
+ollama list | grep 'qwen2.5:7b'    # exact tag must be present
 ```
 
-Then remove the `ollama` service from `docker-compose.yml`.
+To reach Ollama on another address, set `OLLAMA_URL` in the stack environment (e.g.
+`OLLAMA_URL=http://macmini.local:11434`) — no rebuild needed. `GET /api/ai-dashboard/debug`
+shows the address in use. Note: mDNS names (`*.local`) often do **not** resolve inside
+containers — if the status stays `unavailable`, use the host's IP address instead. On macOS
+the container runtime (Docker Desktop / OrbStack) may also need the *Local Network*
+permission to reach other machines on the LAN.
+
+Use `qwen2.5:7b` (or another non-reasoning model): "thinking" models such as `qwen3-vl:8b`
+spend most of the 30 s generation timeout on hidden reasoning tokens and time out.
+
+### Upgrading from the bundled Ollama container
+
+Earlier versions shipped an `ollama` service with its own model copy. After redeploying,
+remove the leftovers on the Docker host to free ~5 GB:
+
+```bash
+docker rm -f burndown_ollama 2>/dev/null
+docker volume ls | grep ollama_data
+docker volume rm <stack>_ollama_data
+```
 
 ## CI/CD
 
@@ -228,7 +258,6 @@ None. Registry authentication uses the built-in `GITHUB_TOKEN`. Ensure the workf
 | Image | Registry |
 |-------|----------|
 | `burndown-postgres` | `ghcr.io/marrothm/burndown-postgres:latest` |
-| `burndown-ollama` | `ghcr.io/marrothm/burndown-ollama:latest` |
 | `burndown-api` | `ghcr.io/marrothm/burndown-api:latest` |
 | `burndown-frontend` | `ghcr.io/marrothm/burndown-frontend:latest` |
 

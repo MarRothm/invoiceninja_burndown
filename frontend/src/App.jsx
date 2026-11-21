@@ -122,7 +122,8 @@ export default function App() {
           <DashboardToggle
             mode={dashMode}
             onToggle={handleToggle}
-            aiAvailable={aiStatus.ollama === 'ready' || aiStatus.ollama === 'pulling'}
+            aiAvailable={aiStatus.ollama === 'ready'}
+            aiStatus={aiStatus.ollama}
           />
         </div>
 
@@ -190,7 +191,7 @@ export default function App() {
 
         {/* AI Dashboard view */}
         {view === 'dashboard' && dashMode === 'ai' && (
-          <AIDashboard key={aiReloadKey} theme={theme} ollamaStatus={aiStatus.ollama} />
+          <AIDashboard key={aiReloadKey} theme={theme} ollamaStatus={aiStatus.ollama} model={aiStatus.model} />
         )}
 
         {/* Legacy Dashboard view */}

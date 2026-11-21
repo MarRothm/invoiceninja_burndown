@@ -15,12 +15,6 @@ services:
       dockerfile: postgres/Dockerfile
     pull_policy: build
 
-  ollama:
-    build:
-      context:    ./ollama
-      dockerfile: Dockerfile
-    pull_policy: build
-
   api:
     build:
       context:    ./api

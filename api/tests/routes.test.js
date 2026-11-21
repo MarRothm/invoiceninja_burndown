@@ -23,12 +23,24 @@ vi.mock('../src/services/turnover.js', async (importActual) => ({
   })),
 }));
 
+vi.mock('../src/services/ai-dashboard.js', () => ({
+  checkOllamaStatus:      vi.fn(async () => 'ready'),
+  isCached:               vi.fn(() => false),
+  generateOrCachedLayout: vi.fn(),
+  getThresholds:          vi.fn(async () => ({ atRisk: 80, overBudget: 100 })),
+  debugInfo:              vi.fn(async () => ({})),
+  updateDeclaration:      vi.fn(async () => {}),
+  invalidateAICache:      vi.fn(),
+}));
+
 // ── Build a minimal Fastify app (without DB / dotenv) ─────────────────────
 import Fastify from 'fastify';
 import cors      from '@fastify/cors';
 import helmet    from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { projectRoutes } from '../src/routes/projects.js';
+import { aiDashboardRoutes } from '../src/routes/ai-dashboard.js';
+import { checkOllamaStatus } from '../src/services/ai-dashboard.js';
 import { getBurndown, listProjectsWithStats } from '../src/services/burndown.js';
 import { runFullSync } from '../src/services/sync.js';
 import { getTimesheet } from '../src/services/timesheet.js';
@@ -51,6 +63,7 @@ async function buildApp() {
   });
 
   await app.register(projectRoutes, { prefix: '/api' });
+  await app.register(aiDashboardRoutes, { prefix: '/api' });
   await app.ready();
   return app;
 }
@@ -61,6 +74,22 @@ beforeAll(async () => { app = await buildApp(); });
 afterAll(async  () => { await app.close(); });
 
 // ── /health ───────────────────────────────────────────────────────────────
+
+describe('GET /api/ai-dashboard/status', () => {
+  it('reports model_missing when the host Ollama lacks the configured model', async () => {
+    checkOllamaStatus.mockResolvedValueOnce('model_missing');
+    const res = await app.inject({ method: 'GET', url: '/api/ai-dashboard/status' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ollama: 'model_missing', model: 'qwen2.5:7b', cached: false });
+  });
+
+  it('reports unavailable when the host Ollama is unreachable', async () => {
+    checkOllamaStatus.mockResolvedValueOnce('unavailable');
+    const res = await app.inject({ method: 'GET', url: '/api/ai-dashboard/status' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ollama).toBe('unavailable');
+  });
+});
 
 describe('GET /api/health', () => {
   it('returns 200 with ok:true', async () => {

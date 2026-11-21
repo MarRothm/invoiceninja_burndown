@@ -1,14 +1,16 @@
 import React from 'react';
 
-export default function DashboardToggle({ mode, onToggle, aiAvailable }) {
+export default function DashboardToggle({ mode, onToggle, aiAvailable, aiStatus }) {
   const isAI = mode === 'ai';
+  const modelMissing = aiStatus === 'model_missing';
+  const offlineTitle = modelMissing ? 'AI model not installed on host Ollama' : 'Host Ollama unreachable';
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <button
         onClick={() => aiAvailable && onToggle(isAI ? 'legacy' : 'ai')}
         disabled={!aiAvailable && !isAI}
-        title={!aiAvailable ? 'Local AI unavailable' : isAI ? 'Switch to legacy dashboard' : 'Switch to AI dashboard'}
+        title={!aiAvailable ? offlineTitle : isAI ? 'Switch to legacy dashboard' : 'Switch to AI dashboard'}
         style={{
           display:        'flex',
           alignItems:     'center',
@@ -30,7 +32,7 @@ export default function DashboardToggle({ mode, onToggle, aiAvailable }) {
         <span>{isAI ? 'AI Dashboard' : 'AI Dashboard'}</span>
       </button>
       {!aiAvailable && (
-        <span style={{ fontSize: 10, color: 'var(--muted)' }}>AI offline</span>
+        <span style={{ fontSize: 10, color: 'var(--muted)' }}>{modelMissing ? 'AI model missing' : 'AI offline'}</span>
       )}
     </div>
   );
