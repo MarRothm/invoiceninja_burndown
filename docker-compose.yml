@@ -44,21 +44,6 @@ services:
       timeout:  3s
       retries:  5
 
-  ollama:
-    image: ghcr.io/marrothm/burndown-ollama:latest
-    pull_policy: always
-    container_name: burndown_ollama
-    restart: unless-stopped
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - internal
-    healthcheck:
-      test:     ["CMD", "ollama", "list"]
-      interval: 30s
-      timeout:  10s
-      retries:  20
-      start_period: 300s
 
   api:
     image: ghcr.io/marrothm/burndown-api:latest
@@ -73,7 +58,12 @@ services:
       INVOICENINJA_URL:      ${INVOICENINJA_URL}
       INVOICENINJA_API_KEY:  ${INVOICENINJA_API_KEY}
       CORS_ORIGIN:           ${PUBLIC_URL:-*}
-      OLLAMA_URL:            http://ollama:11434
+      OLLAMA_URL:            ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL:          ${OLLAMA_MODEL:-qwen2.5:7b}
+    # Reach the Ollama running on the Docker host (no-op on macOS Docker Desktop/OrbStack,
+    # required on Linux Docker Engine >= 20.10).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - api_data:/app/data
     depends_on:
@@ -124,7 +114,6 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  ollama_data:
   api_data:
 
 networks:

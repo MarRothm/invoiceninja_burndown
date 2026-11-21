@@ -25,6 +25,11 @@ Known accepted risks in a local-only deployment:
 - All project data from InvoiceNinja is accessible to anyone who can reach the API port —
   including invoiced, paid and open amounts per project and year (turnover endpoints), so the
   network boundary matters even more
+- The AI dashboard uses the Ollama instance on the Docker host, which has no authentication
+  and is reachable from the local network (port 11434). Anyone on the network can run
+  inference on it and pull or delete its models. The private-network boundary is the control.
+  Optional hardening: bind the host Ollama to loopback only (`OLLAMA_HOST=127.0.0.1`) — on
+  macOS the stack still reaches it via `host.docker.internal`, but other LAN clients lose access
 
 If you run this on a public-facing server, add authentication (e.g. HTTP Basic Auth via
 your reverse proxy, or a VPN/firewall rule) in front of the service.

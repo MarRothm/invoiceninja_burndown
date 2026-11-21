@@ -62,13 +62,16 @@ The frontend renderer handles both streaming and cached responses identically.
 
 | Status | Condition | Body |
 |--------|-----------|------|
-| 503 | Ollama container unreachable | `{"error":"AI_UNAVAILABLE","status":503}` |
+| 503 | Ollama unreachable or model not found (404) | `{"error":"AI_UNAVAILABLE","status":503}` |
 | 504 | Ollama did not respond within 30 s | `{"error":"AI_TIMEOUT","status":504}` |
 | 500 | Internal error | `{"error":"internal_error","status":500}` |
 
 ---
 
 ## GET /api/ai-dashboard/status
+
+> **Superseded** by `specs/006-host-ollama-instance/contracts/ai-dashboard-status.md`
+> (`pulling` → `model_missing`; Ollama now runs on the Docker host).
 
 Health check for the AI service. Used by the frontend to decide whether to enable
 or disable the AI dashboard toggle (FR-010).

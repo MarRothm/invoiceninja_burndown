@@ -7,7 +7,7 @@ import { fetchProjects, fetchAIDashboard, fetchAIDashboardConfig } from '../../h
 const TIMEOUT_MS = 30_000;
 const STALL_MS   = 15_000; // T047: stall detection — no new token for 15 s
 
-export default function AIDashboard({ theme, ollamaStatus }) {
+export default function AIDashboard({ theme, ollamaStatus, model = 'qwen2.5:7b' }) {
   const [response, setResponse]   = useState('');
   const [streaming, setStreaming] = useState(false);
   const [status, setStatus]       = useState('idle'); // idle|loading|streaming|stalled|ready|error|unavailable
@@ -140,11 +140,23 @@ export default function AIDashboard({ theme, ollamaStatus }) {
     return (
       <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--muted)' }}>
         <div style={{ fontSize: 32, marginBottom: 12 }}>◇</div>
-        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Local AI unavailable</div>
-        <div style={{ fontSize: 12 }}>
-          Ensure the Ollama container is running:<br />
-          <code style={{ fontSize: 11 }}>docker compose up -d ollama</code>
-        </div>
+        {ollamaStatus === 'model_missing' ? (
+          <>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Model not installed on host Ollama</div>
+            <div style={{ fontSize: 12 }}>
+              Run on the Docker host:<br />
+              <code style={{ fontSize: 11 }}>ollama pull {model}</code>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Host Ollama unreachable</div>
+            <div style={{ fontSize: 12 }}>
+              Ensure Ollama is running on the Docker host and reachable at OLLAMA_URL<br />
+              <code style={{ fontSize: 11 }}>default: http://host.docker.internal:11434</code>
+            </div>
+          </>
+        )}
       </div>
     );
   }

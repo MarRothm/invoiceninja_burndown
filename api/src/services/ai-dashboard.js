@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from 'fs/promises';
 import { resolve } from 'path';
 import { listProjectsWithStats } from './burndown.js';
 
-const ollamaBaseUrl = process.env.OLLAMA_URL ?? 'http://ollama:11434';
+const ollamaBaseUrl = (process.env.OLLAMA_URL ?? 'http://host.docker.internal:11434').replace(/\/+$/, '');
 const model         = process.env.OLLAMA_MODEL ?? 'qwen2.5:7b';
 // Baked-in default (COPY in Dockerfile)
 const declarationPath = resolve(process.cwd(), 'dashboard.declaration.md');
@@ -24,15 +24,20 @@ export function invalidateAICache() {
 
 // ── Ollama health check ────────────────────────────────────────────────────
 
+// Ollama treats an untagged model reference as `<name>:latest`.
+const normModel = (n) => (n && !n.includes(':') ? `${n}:latest` : n);
+
 export async function checkOllamaStatus() {
   try {
     const res = await fetch(`${ollamaBaseUrl}/api/tags`, { signal: AbortSignal.timeout(3000) });
     if (!res.ok) return 'unavailable';
     const body = await res.json();
-    // If the model list endpoint responds but our model isn't ready yet, report pulling
+    // The host Ollama owns its models — the stack never pulls. Require the exact
+    // configured model:tag; another tag of the same family does not count.
+    const want = normModel(model);
     const models = body.models ?? [];
-    const present = models.some(m => m.name?.startsWith(model.split(':')[0]));
-    return present ? 'ready' : 'pulling';
+    const present = models.some(m => normModel(m.name) === want || normModel(m.model) === want);
+    return present ? 'ready' : 'model_missing';
   } catch {
     return 'unavailable';
   }
@@ -151,8 +156,9 @@ async function streamFromOllama(declarationContent, projects, onToken) {
   }
 
   if (!res.ok) {
-    const e = new Error(`Ollama returned ${res.status}`);
-    e.code = res.status === 503 ? 'AI_UNAVAILABLE' : 'AI_ERROR';
+    const e = new Error(`Ollama returned ${res.status} (${ollamaBaseUrl})`);
+    // 404 = model not installed on the host Ollama → treat like unavailable
+    e.code = (res.status === 503 || res.status === 404) ? 'AI_UNAVAILABLE' : 'AI_ERROR';
     throw e;
   }
 
