@@ -1,4 +1,5 @@
-FROM node:20-alpine AS build
+# Build stage output is static files → run it natively on the build host, not under emulation
+FROM --platform=$BUILDPLATFORM node:20-alpine AS build
 
 WORKDIR /app
 COPY package.json package-lock.json ./

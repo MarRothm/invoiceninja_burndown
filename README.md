@@ -248,6 +248,8 @@ docker volume rm <stack>_ollama_data
 ## CI/CD
 
 Docker images are built and published automatically via GitHub Actions on every push to `master`.
+Images are multi-arch (`linux/amd64` and `linux/arm64`), so they run on Intel hosts and on Apple
+Silicon hosts such as the Mac mini running Portainer.
 
 ### GitHub Secrets required
 
