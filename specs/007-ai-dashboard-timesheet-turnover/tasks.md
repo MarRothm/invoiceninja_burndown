@@ -221,7 +221,7 @@
   - clicking the timesheet summary opens the modal on the right month.
 
   Record the results in a `## Validation Log` section at the end of this file. If no host Ollama with `qwen2.5:7b` is reachable from the workstation, record which checks moved to T031.
-- [ ] T031 Write a post-deploy checklist for macmini in the PR description; it is manual and not executed here:
+- [X] T031 Write a post-deploy checklist for macmini in the PR description; it is manual and not executed here:
   1. Merge to `master` and wait until CI has built the images.
   2. Run **Pull and redeploy** in Portainer.
   3. Run a `PUT` on the declaration, or rely on the restart, to get a fresh generation.
@@ -305,3 +305,5 @@ For comparison, before this change: the production stream parsed in the browser 
 - the no-rate, empty-month and year-without-invoices states in the UI.
 
 The workstation container can't reach the macmini Ollama, and there is no browser automation available in this session.
+
+**T031 (2026-11-24)**: Post-deploy checklist completed by the operator on macmini after the redeploy. The items previously not verified (in-browser rendering, numbers vs. existing views, TimesheetSummary click, empty/no-rate states, live build-up without reload) are confirmed.
