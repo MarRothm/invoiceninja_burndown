@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readFile } from 'fs/promises';
 
 // The service imports burndown.js → db/pool.js; keep the DB out of these tests.
 vi.mock('../src/services/burndown.js', () => ({
@@ -88,5 +89,40 @@ describe('checkOllamaStatus()', () => {
     global.fetch.mockResolvedValue(tagsResponse(['qwen2.5:7b']));
     await checkOllamaStatus();
     expect(global.fetch.mock.calls[0][0]).toBe('http://macmini.local:11434/api/tags');
+  });
+});
+
+describe('SYSTEM_PROMPT', () => {
+  it('documents the turnover building blocks', async () => {
+    const { SYSTEM_PROMPT } = await loadService();
+    expect(SYSTEM_PROMPT).toContain('ProjectTurnover(projectId)');
+    expect(SYSTEM_PROMPT).toContain('TurnoverOverview(year)');
+    expect(SYSTEM_PROMPT).toContain('TurnoverOverview()');
+    expect(SYSTEM_PROMPT).toContain('TimesheetSummary(projectId, month)');
+  });
+
+  it('requires the root statement first (progressive rendering)', async () => {
+    const { SYSTEM_PROMPT } = await loadService();
+    expect(SYSTEM_PROMPT).toContain('FIRST statement MUST be');
+    expect(SYSTEM_PROMPT).toContain('root = Dashboard(');
+    expect(SYSTEM_PROMPT).not.toContain('The LAST statement MUST be');
+  });
+
+  it('shows a root-first example', async () => {
+    const { SYSTEM_PROMPT } = await loadService();
+    const lines = SYSTEM_PROMPT.split('\n');
+    const idx = lines.findIndex(l => l.startsWith('Example'));
+    expect(idx).toBeGreaterThan(-1);
+    const firstCode = lines.slice(idx + 1).find(l => l.trim());
+    expect(firstCode.startsWith('root = Dashboard(')).toBe(true);
+  });
+});
+
+describe('default declaration', () => {
+  it('shows the turnover overview and the timesheet, but no per-project turnover', async () => {
+    const text = (await readFile(new URL('../dashboard.declaration.md', import.meta.url), 'utf8')).toLowerCase();
+    expect(text).toContain('turnover overview');
+    expect(text).toContain('timesheet');
+    expect(text).not.toContain('project turnover');
   });
 });

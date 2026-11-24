@@ -7,7 +7,7 @@ import { fetchProjects, fetchAIDashboard, fetchAIDashboardConfig } from '../../h
 const TIMEOUT_MS = 30_000;
 const STALL_MS   = 15_000; // T047: stall detection — no new token for 15 s
 
-export default function AIDashboard({ theme, ollamaStatus, model = 'qwen2.5:7b' }) {
+export default function AIDashboard({ theme, ollamaStatus, model = 'qwen2.5:7b', onOpenTimesheet }) {
   const [response, setResponse]   = useState('');
   const [streaming, setStreaming] = useState(false);
   const [status, setStatus]       = useState('idle'); // idle|loading|streaming|stalled|ready|error|unavailable
@@ -78,7 +78,7 @@ export default function AIDashboard({ theme, ollamaStatus, model = 'qwen2.5:7b' 
 
         // T048: empty-response guard — [DONE] with no renderable components is an error
         const accumulated = responseRef.current;
-        const hasComponents = /ProjectCard|BurndownChart|Dashboard/.test(accumulated);
+        const hasComponents = /Dashboard|ProjectCard|BurndownChart|TimesheetSummary|ProjectTurnover|TurnoverOverview/.test(accumulated);
         if (!hasComponents || !accumulated.trim()) {
           setStatus('error');
           setErrorMsg('Dashboard generation failed — no components were generated.');
@@ -133,7 +133,7 @@ export default function AIDashboard({ theme, ollamaStatus, model = 'qwen2.5:7b' 
     }
   }, [ollamaStatus, load]);
 
-  const contextValue = { projects, theme, thresholds };
+  const contextValue = { projects, theme, thresholds, onOpenTimesheet };
 
   // ── Unavailable state ──
   if (status === 'unavailable') {

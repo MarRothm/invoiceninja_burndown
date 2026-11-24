@@ -40,7 +40,7 @@ import helmet    from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { projectRoutes } from '../src/routes/projects.js';
 import { aiDashboardRoutes } from '../src/routes/ai-dashboard.js';
-import { checkOllamaStatus } from '../src/services/ai-dashboard.js';
+import { checkOllamaStatus, generateOrCachedLayout } from '../src/services/ai-dashboard.js';
 import { getBurndown, listProjectsWithStats } from '../src/services/burndown.js';
 import { runFullSync } from '../src/services/sync.js';
 import { getTimesheet } from '../src/services/timesheet.js';
@@ -74,6 +74,29 @@ beforeAll(async () => { app = await buildApp(); });
 afterAll(async  () => { await app.close(); });
 
 // ── /health ───────────────────────────────────────────────────────────────
+
+// Reassemble SSE events the way the browser's EventSource does: events end with a
+// blank line; the data: lines of one event are joined with \n (one leading space stripped).
+function sseEvents(body) {
+  return body.split('\n\n').filter(e => e.length).map(e =>
+    e.split('\n').filter(l => l.startsWith('data:'))
+      .map(l => l.slice(5).replace(/^ /, '')).join('\n'));
+}
+
+describe('GET /api/ai-dashboard SSE framing', () => {
+  it('delivers tokens containing newlines byte-identical (multi-line data)', async () => {
+    generateOrCachedLayout.mockImplementationOnce(async (write) => {
+      write('card2 = ProjectCard(2)\n');
+      write('chart2');
+    });
+    const res = await app.inject({ method: 'GET', url: '/api/ai-dashboard' });
+    expect(res.body).toContain('data: card2 = ProjectCard(2)\ndata: \n\n');
+    expect(res.body).toContain('data: chart2\n\n');
+    expect(res.body.endsWith('data: [DONE]\n\n')).toBe(true);
+    const tokens = sseEvents(res.body).filter(d => d !== '[DONE]');
+    expect(tokens.join('')).toBe('card2 = ProjectCard(2)\nchart2');
+  });
+});
 
 describe('GET /api/ai-dashboard/status', () => {
   it('reports model_missing when the host Ollama lacks the configured model', async () => {

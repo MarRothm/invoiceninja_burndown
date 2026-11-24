@@ -162,48 +162,63 @@ the **AI-generated dashboard**. Your preference is remembered across page reload
 The toggle is disabled when the host Ollama is unreachable or the configured model is not
 installed on it (the UI then shows the `ollama pull <model>` command to run on the host).
 
-### Customising the Layout
+### Dashboard composition (declaration)
 
-Edit `api/dashboard.declaration.md` — plain prose, no code:
+What the AI dashboard shows is defined in plain language in **`api/dashboard.declaration.md`**
+(no code). The default:
 
 ```
-Show all in_progress projects ordered by budget consumed (highest progress percentage first).
+Show the turnover overview for the current year at the top.
+
+Then show all in_progress projects ordered by budget consumed (highest progress percentage first).
 Include every project with status "in_progress", even those with 0 hours logged.
 
-For each project show a ProjectCard (which includes a built-in status badge and progress bar)
-followed by a BurndownChart below it.
-
-Status thresholds: at-risk >= 80%, over-budget > 100%.
+For each project show a ProjectCard (which includes a built-in status badge and progress bar),
+followed by its BurndownChart and the timesheet summary of the current month.
 ```
 
-After saving the file, commit and push to `master` — GitHub Actions rebuilds the `burndown-api` image; then redeploy the stack in Portainer (see [Portainer deployment](#portainer-deployment-production)).
+Optional status thresholds can be added as a sentence, e.g. `Status thresholds: at-risk >= 80%, over-budget > 100%.`
 
-To update the declaration **without** rebuilding, use the API:
+After editing the file, commit and push to `master` — GitHub Actions rebuilds the `burndown-api` image; then redeploy the stack in Portainer (see [Portainer deployment](#portainer-deployment-production)).
+
+To change the composition **without** rebuilding, use the API:
 
 ```bash
 curl -X PUT http://localhost:3000/api/ai-dashboard/declaration \
   -H 'Content-Type: application/json' \
-  -d '{"content": "Show all in_progress projects ordered by budget consumed..."}'
+  -d '{"content": "Show the turnover overview for 2025. Then for each in_progress project a ProjectCard and its project turnover."}'
 ```
 
-The new content is persisted to a Docker volume and takes effect on the next dashboard load (cache is invalidated automatically).
+The content is stored in `/app/data/dashboard.declaration.md` (Docker volume), takes priority over the
+baked-in file, and invalidates the layout cache — the next dashboard load regenerates the layout.
+The dashboard builds up live while it is generated; no reload is needed.
 
 ### Available Components
 
-The AI model composes layouts using openUI Lang function-call syntax:
+Building blocks only appear when the declaration asks for them. The AI composes them in openUI Lang,
+root statement first:
 
 ```
+root   = Dashboard([to, card1, chart1, ts1])
+to     = TurnoverOverview()
 card1  = ProjectCard(1)
 chart1 = BurndownChart(1)
-root   = Dashboard([card1, chart1])
+ts1    = TimesheetSummary(1)
 ```
 
-| Component | Argument | Displays |
-|-----------|----------|---------|
-| `Dashboard(children)` | array of components | Root container — every layout must end with `root = Dashboard([...])` |
-| `ProjectCard(projectId)` | project ID (number) | Name, budget, hours logged, remaining, status badge (threshold-driven) |
-| `BurndownChart(projectId)` | project ID (number) | Ideal vs. actual burndown line chart |
-| `StatusBadge` | — | Embedded inside ProjectCard; thresholds set by declaration |
+| Component | Arguments | Displays | Example sentence for the declaration |
+|-----------|-----------|----------|--------------------------------------|
+| `Dashboard(children)` | array of components | Root container — first statement `root = Dashboard([...])` | — |
+| `ProjectCard(projectId)` | project ID | Name, budget, hours logged, remaining, status badge (threshold-driven) | "For each project show a ProjectCard" |
+| `BurndownChart(projectId)` | project ID | Ideal vs. actual burndown line chart | "…followed by its BurndownChart" |
+| `TimesheetSummary(projectId, month?)` | project ID, `"YYYY-MM"` | Month total of booked hours, hour rate and EUR; click opens the full timesheet (copy / CSV) | "…and the timesheet summary of the current month" / "…timesheet for October 2026" |
+| `ProjectTurnover(projectId)` | project ID | Invoiced / paid / open per year for the project | "…also show the project turnover for each project" |
+| `TurnoverOverview(year?)` | year | Cross-project invoiced / paid / open for one year | "Show the turnover overview for the current year at the top" / "…for 2025" |
+| `StatusBadge` | — | Embedded inside ProjectCard; thresholds set by declaration | — |
+
+Without a month or year, the blocks use the **current** month / year, resolved when the dashboard is
+displayed (a cached layout therefore never shows a stale month). Amounts are the same as in the
+Timesheet and Turnover views (gross, incl. VAT for turnover).
 
 ### Host Ollama
 
