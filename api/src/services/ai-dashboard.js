@@ -45,8 +45,14 @@ export async function checkOllamaStatus() {
 
 // ── Declaration file ───────────────────────────────────────────────────────
 
-const DEFAULT_DECLARATION = `Show all projects with their burndown charts and current status.
-For each project display a ProjectCard, a BurndownChart, and a StatusBadge.`;
+// Fallback when no declaration file exists — keep in sync with api/dashboard.declaration.md
+const DEFAULT_DECLARATION = `Show the turnover overview for the current year at the top.
+
+Then show all in_progress projects ordered by budget consumed (highest progress percentage first).
+Include every project with status "in_progress", even those with 0 hours logged.
+
+For each project show a ProjectCard (which includes a built-in status badge and progress bar),
+followed by its BurndownChart and the timesheet summary of the current month.`;
 
 async function readDeclaration() {
   // Runtime override takes priority (volume-mounted, operator-editable without rebuild)
@@ -84,7 +90,7 @@ export async function updateDeclaration(content) {
 
 // ── System prompt ──────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You generate dashboard layouts using OpenUI Lang.
+export const SYSTEM_PROMPT = `You generate dashboard layouts using OpenUI Lang.
 Output ONLY valid OpenUI Lang program code — no prose, no HTML, no markdown, no explanations.
 
 OpenUI Lang syntax rules:
@@ -97,22 +103,28 @@ OpenUI Lang syntax rules:
 Available components (positional args):
 - ProjectCard(projectId)   — project summary card with built-in status badge; projectId is a number
 - BurndownChart(projectId) — burndown chart; projectId is a number
+- ProjectTurnover(projectId) — invoiced/paid/open per year for one project
+- TurnoverOverview(year) — cross-project turnover for one year; year is optional
+- TimesheetSummary(projectId, month) — month total of booked hours + EUR for one project; month "YYYY-MM" is optional
 - Dashboard(children)      — root container; children is an array of components  ← REQUIRED
 
 Rules:
-1. The LAST statement MUST be:  root = Dashboard([...all components...])
+1. The FIRST statement MUST be:  root = Dashboard([...all component names in display order...]) — then define each component on its own line, in the same order.
 2. Use EXACT project IDs from the project list.
-3. Place every component inside Dashboard's children array.
+3. Every component you define MUST be listed in Dashboard's children array.
 4. Output NOTHING outside the program (no greetings, no explanations).
 5. EVERY project in the list with status "in_progress" MUST appear in the output — including projects with 0 hours logged. Do not skip any project.
 6. Order projects by their \`progress\` field as directed in the declaration.
+7. Use ProjectTurnover only if the declaration asks for turnover per project; use TurnoverOverview only if it asks for a turnover overview. Never add them otherwise.
+8. Pass a year only if the declaration names a specific year; otherwise write TurnoverOverview() with no argument.
+9. Use TimesheetSummary only if the declaration asks for the timesheet. Pass a month only if the declaration names a specific month; otherwise write TimesheetSummary(projectId) with one argument.
 
 Example for two projects (IDs 1 and 3):
+root = Dashboard([card1, chart1, card3, chart3])
 card1 = ProjectCard(1)
 chart1 = BurndownChart(1)
 card3 = ProjectCard(3)
-chart3 = BurndownChart(3)
-root = Dashboard([card1, chart1, card3, chart3])`;
+chart3 = BurndownChart(3)`;
 
 // ── Ollama streaming ───────────────────────────────────────────────────────
 

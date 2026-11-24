@@ -7,6 +7,8 @@
 
 ## GET /api/ai-dashboard
 
+> **Amended** by `specs/007-ai-dashboard-timesheet-turnover/contracts/ai-dashboard-stream-and-grammar.md` (multi-line SSE data framing; root statement first; new components).
+
 Streams the AI-generated dashboard layout as openUI Lang tokens. Returns a cached
 layout instantly if the declaration file has not changed since the last generation.
 
@@ -178,6 +180,8 @@ status, project list, and a test Ollama completion. Not intended for production 
 ---
 
 ## openUI Lang Component Grammar
+
+> **Amended** by `specs/007-ai-dashboard-timesheet-turnover/contracts/ai-dashboard-stream-and-grammar.md` (multi-line SSE data framing; root statement first; new components).
 
 The AI model produces output conforming to this grammar. The renderer ignores any
 name not registered in the component registry.

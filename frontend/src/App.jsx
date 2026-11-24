@@ -35,7 +35,10 @@ export default function App() {
   const [aiStatus,     setAIStatus]     = useState({ ollama: 'unavailable', cached: false });
   const [aiReloadKey,  setAiReloadKey]  = useState(0);
   const [timesheetProject, setTimesheetProject] = useState(null);
-  const closeTimesheet = useCallback(() => setTimesheetProject(null), []);
+  const [timesheetMonth,   setTimesheetMonth]   = useState(null);
+  const closeTimesheet = useCallback(() => { setTimesheetProject(null); setTimesheetMonth(null); }, []);
+  // AI TimesheetSummary block: open the full timesheet on the block's month
+  const openTimesheetFromAI = useCallback((p, m) => { setTimesheetMonth(m); setTimesheetProject(p); }, []);
   const [view,         setView]         = useState('dashboard');
   const [turnoverKey,  setTurnoverKey]  = useState(0);
 
@@ -191,7 +194,7 @@ export default function App() {
 
         {/* AI Dashboard view */}
         {view === 'dashboard' && dashMode === 'ai' && (
-          <AIDashboard key={aiReloadKey} theme={theme} ollamaStatus={aiStatus.ollama} model={aiStatus.model} />
+          <AIDashboard key={aiReloadKey} theme={theme} ollamaStatus={aiStatus.ollama} model={aiStatus.model} onOpenTimesheet={openTimesheetFromAI} />
         )}
 
         {/* Legacy Dashboard view */}
@@ -302,7 +305,7 @@ export default function App() {
       </main>
 
       {timesheetProject && (
-        <TimesheetModal project={timesheetProject} onClose={closeTimesheet} />
+        <TimesheetModal project={timesheetProject} onClose={closeTimesheet} initialMonth={timesheetMonth ?? undefined} />
       )}
     </div>
   );

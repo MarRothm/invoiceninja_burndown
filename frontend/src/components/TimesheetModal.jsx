@@ -62,8 +62,8 @@ function FormatToggle({ format, onChange }) {
   );
 }
 
-export default function TimesheetModal({ project, onClose }) {
-  const [month,     setMonth]     = useState(currentMonth);
+export default function TimesheetModal({ project, onClose, initialMonth }) {
+  const [month,     setMonth]     = useState(() => initialMonth ?? currentMonth());
   const [format,    setFormat]    = useState(() => localStorage.getItem(FORMAT_KEY) ?? 'decimal');
   const [data,      setData]      = useState(null);
   const [status,    setStatus]    = useState('loading');

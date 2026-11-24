@@ -42,7 +42,9 @@ export async function aiDashboardRoutes(fastify) {
       'X-Accel-Buffering': 'no', // disable Nginx buffering for SSE
     });
 
-    const write = (data) => raw.write(`data: ${data}\n\n`);
+    // SSE multi-line data: EventSource rejoins the data: lines with \n, so tokens that
+    // contain newlines arrive byte-identical (contract 007 §1).
+    const write = (data) => raw.write(String(data).split('\n').map(l => `data: ${l}`).join('\n') + '\n\n');
 
     try {
       await generateOrCachedLayout(write);
