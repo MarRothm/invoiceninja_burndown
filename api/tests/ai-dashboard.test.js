@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFile } from 'fs/promises';
+import { listProjectsWithStats } from '../src/services/burndown.js';
 
 // The service imports burndown.js → db/pool.js; keep the DB out of these tests.
 vi.mock('../src/services/burndown.js', () => ({
@@ -115,6 +116,66 @@ describe('SYSTEM_PROMPT', () => {
     expect(idx).toBeGreaterThan(-1);
     const firstCode = lines.slice(idx + 1).find(l => l.trim());
     expect(firstCode.startsWith('root = Dashboard(')).toBe(true);
+  });
+});
+
+describe('SYSTEM_PROMPT lump sum (008)', () => {
+  it('tells the model to skip burndown/timesheet for lump-sum projects and keep the list order', async () => {
+    const { SYSTEM_PROMPT } = await loadService();
+    expect(SYSTEM_PROMPT).toContain('billing_mode');
+    expect(SYSTEM_PROMPT).toContain('lump_sum');
+    expect(SYSTEM_PROMPT).toContain('never use BurndownChart or TimesheetSummary');
+    expect(SYSTEM_PROMPT).toContain('Keep the order of the project list');
+  });
+});
+
+describe('generateOrCachedLayout lump sum (008)', () => {
+  const ollamaStream = () => new Response(
+    'data: {"choices":[{"delta":{"content":"root = Dashboard([card3])\\ncard3 = ProjectCard(3)"}}]}\n\ndata: [DONE]\n\n',
+    { status: 200 },
+  );
+  const projects = () => [
+    { id: 1, name: 'A', billing_mode: 'hourly',   progress: 50, status: 'in_progress', lump_sum: null },
+    { id: 2, name: 'B', billing_mode: 'lump_sum', progress: 0,  status: 'in_progress',
+      lump_sum: { agreed: 1000, currency: 'EUR', invoiced: 300, earned_pct: 30 } },
+    { id: 3, name: 'C', billing_mode: 'hourly',   progress: 90, status: 'in_progress', lump_sum: null },
+    { id: 4, name: 'D', billing_mode: 'hourly',   progress: 99, status: 'closed',      lump_sum: null },
+  ];
+  const sentProjects = (call) => {
+    const body = JSON.parse(global.fetch.mock.calls[call][1].body);
+    const user = body.messages.find(m => m.role === 'user').content;
+    return JSON.parse(user.slice(user.indexOf('['), user.lastIndexOf(']') + 1));
+  };
+
+  it('orders hourly by progress, then lump sum, and marks lump-sum projects', async () => {
+    const { generateOrCachedLayout } = await loadService();
+    vi.mocked(listProjectsWithStats).mockResolvedValue(projects());
+    global.fetch.mockImplementation(async () => ollamaStream());
+
+    await generateOrCachedLayout(() => {});
+
+    const sent = sentProjects(0);
+    expect(sent.map(p => p.id)).toEqual([3, 1, 2]);
+    expect(sent[2]).toMatchObject({ billing_mode: 'lump_sum', progress: null, earned_pct: 30 });
+    expect(sent[0]).toMatchObject({ billing_mode: 'hourly', progress: 90 });
+  });
+
+  it('serves the cache until a billing mode changes', async () => {
+    const { generateOrCachedLayout } = await loadService();
+    global.fetch.mockImplementation(async () => ollamaStream());
+    vi.mocked(listProjectsWithStats).mockResolvedValue(projects());
+
+    await generateOrCachedLayout(() => {});
+    await generateOrCachedLayout(() => {});
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    const changed = projects();
+    changed[0] = { ...changed[0], billing_mode: 'lump_sum',
+      lump_sum: { agreed: null, currency: 'EUR', invoiced: 0, earned_pct: null } };
+    vi.mocked(listProjectsWithStats).mockResolvedValue(changed);
+
+    await generateOrCachedLayout(() => {});
+    expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 });
 

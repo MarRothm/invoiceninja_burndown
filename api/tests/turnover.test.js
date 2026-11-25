@@ -126,4 +126,17 @@ describe('getYearTurnover', () => {
     expect(t.years_available).toEqual([]);
     expect(t.total.invoiced).toBe(0);
   });
+  it('does not filter by billing mode — lump-sum projects stay in the totals (008 SC-003)', async () => {
+    vi.mocked(query)
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce(never);
+
+    await getYearTurnover(2026);
+
+    for (const [sql] of vi.mocked(query).mock.calls) {
+      expect(sql).not.toContain('tags');
+      expect(sql).not.toContain('custom_value');
+    }
+  });
 });

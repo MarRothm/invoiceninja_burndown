@@ -9,6 +9,7 @@ import ProjectTurnover from './components/ProjectTurnover.jsx';
 import TurnoverOverview from './components/TurnoverOverview.jsx';
 import { fetchProjects, fetchBurndown, triggerSync, fetchAIStatus } from './hooks/api.js';
 import { useTheme } from './hooks/useTheme.js';
+import { formatMoney } from './utils/money.js';
 
 const Stat = ({ label, value, color }) => (
   <div style={{ textAlign: 'center' }}>
@@ -77,15 +78,22 @@ export default function App() {
     if (dashMode === 'ai') handleToggle('legacy');
   };
 
+  // Billing mode from the latest project list (a sync may have changed it)
+  const current         = projects.find(p => p.id === selected?.id) ?? selected;
+  const isLumpSum       = current?.billing_mode === 'lump_sum';
+  const selectedLumpSum = isLumpSum ? current.lump_sum : null;
+
   useEffect(() => {
     if (!selected) return;
-    setChartLoad(true);
     setBurndown(null);
+    // Lump-sum projects have no hour burndown
+    if (isLumpSum) { setChartLoad(false); return; }
+    setChartLoad(true);
     fetchBurndown(selected.id)
       .then(setBurndown)
       .catch(e => setError(e.message))
       .finally(() => setChartLoad(false));
-  }, [selected?.id]);
+  }, [selected?.id, isLumpSum]);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -176,7 +184,7 @@ export default function App() {
             project={p}
             selected={selected?.id === p.id}
             onClick={() => { setSelected(p); setView('dashboard'); }}
-            onOpenTimesheet={() => setTimesheetProject(p)}
+            onOpenTimesheet={p.billing_mode === 'lump_sum' ? undefined : () => setTimesheetProject(p)}
           />
         ))}
 
@@ -221,7 +229,7 @@ export default function App() {
                 <h1 style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.1 }}>
                   {selected.name}
                 </h1>
-                <button
+                {!isLumpSum && <button
                   onClick={() => setTimesheetProject(selected)}
                   style={{
                     padding: '6px 12px',
@@ -234,7 +242,7 @@ export default function App() {
                   }}
                 >
                   ▦ Timesheet
-                </button>
+                </button>}
               </div>
               {selected.deadline && (
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
@@ -270,7 +278,35 @@ export default function App() {
               </div>
             )}
 
+            {/* Lump-sum stats: agreed / invoiced / earned */}
+            {isLumpSum && (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 1,
+                background: 'var(--border)',
+                border: '1px solid var(--border)',
+                borderRadius: 4,
+                overflow: 'hidden',
+                marginBottom: 28,
+              }}>
+                {[
+                  { label: 'Agreed lump sum',
+                    value: selectedLumpSum.agreed == null ? 'Not set' : formatMoney(selectedLumpSum.agreed, selectedLumpSum.currency) },
+                  { label: 'Invoiced', value: formatMoney(selectedLumpSum.invoiced, selectedLumpSum.currency), color: 'var(--accent)' },
+                  { label: 'Earned',
+                    value: selectedLumpSum.earned_pct == null ? '—' : `${selectedLumpSum.earned_pct}%`,
+                    color: selectedLumpSum.earned_pct > 100 ? 'var(--accent2)' : 'var(--accent3)' },
+                ].map(s => (
+                  <div key={s.label} style={{ background: 'var(--card)', padding: '18px 0' }}>
+                    <Stat {...s} />
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Chart */}
+            {!isLumpSum && (<>
             <div style={{
               background: 'var(--card)',
               border: '1px solid var(--border)',
@@ -297,6 +333,7 @@ export default function App() {
               <span><span style={{ color: 'var(--accent3)' }}>──</span> Ideal</span>
               <span><span style={{ color: 'var(--accent)' }}>──</span> Actual</span>
             </div>
+            </>)}
 
             <ProjectTurnover projectId={selected.id} reloadKey={turnoverKey} />
           </>

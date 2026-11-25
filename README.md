@@ -95,7 +95,7 @@ InvoiceNinja API
 
 ```
 GET  /api/health                    → Status
-GET  /api/projects                  → All projects with stats
+GET  /api/projects                  → All projects with stats (incl. billing_mode, lump_sum)
 GET  /api/projects/:id/burndown     → Burndown data for a project
 GET  /api/projects/:id/timesheet?month=YYYY-MM → Daily totals of completed hours for one month
 GET  /api/projects/:id/turnover     → Invoiced / paid / open per invoice year for a project
@@ -149,6 +149,46 @@ and calendar year.
   drafts, cancelled, reversed and deleted invoices, and invoices without a project.
 - The `invoices` table is created automatically when the API or worker starts, also on existing
   databases. The first sync after upgrading fetches all invoices.
+
+## Lump-sum projects (Pauschalabrechnung)
+
+Projects billed by lump sums for reached goals (instead of time spent) are marked in InvoiceNinja
+with the project tag **Pauschalabrechnung**:
+
+1. Settings → Tags ("Stichworte"): create the tag `Pauschalabrechnung`, type **Project**, and assign
+   it to the project. Matching ignores case and surrounding spaces; other tags are ignored.
+2. Settings → Custom fields → Projects:
+   - **Custom field 3 – "Vereinbarte Pauschale"**: agreed lump sum. German or English number
+     formats are accepted (`10.000,00`, `10,000.00`, `10'000`, `10000`). A single separator
+     followed by three digits is a thousands separator (`1.500` = 1500).
+   - **Custom field 4 – "Projektwährung"**: currency code of the lump sum (e.g. `CHF`); empty = EUR.
+   - Custom field 2 keeps its meaning (actual end date).
+
+What changes for a lump-sum project (after the next sync):
+
+| View | Hourly project (unchanged) | Lump-sum project |
+|------|----------------------------|------------------|
+| Project card | Hours, budget, progress % | `LUMP SUM` badge, agreed lump sum, **earned %** (no timesheet icon) |
+| Project detail | Hour stats, burndown chart, Timesheet button, turnover | Agreed / Invoiced / Earned, turnover — no burndown, no timesheet |
+| AI Dashboard | Card, burndown, timesheet summary | Lump-sum card, then the project turnover instead of burndown / timesheet |
+| Turnover overview | included | included — totals are unaffected by the billing mode |
+
+**Earned %** = invoiced (all years; same counting rules as the Turnover table) ÷ agreed lump sum,
+rounded to whole percent; it can exceed 100 %. Without an agreed lump sum the card shows
+"Lump sum not set". Invoices are assumed to be in the project currency (no conversion).
+
+`GET /api/projects` returns per project `billing_mode` (`"hourly"` | `"lump_sum"`) and `lump_sum`
+(`{ agreed, currency, invoiced, earned_pct }`, or `null` for hourly projects).
+
+Adding or removing the tag in InvoiceNinja updates the project, so the regular sync picks it up.
+If a project was tagged before an InvoiceNinja version with tag support and still shows as hourly,
+force a full project resync:
+
+```bash
+docker compose exec postgres psql -U burndown -d burndown \
+  -c "UPDATE sync_state SET last_synced_at = 'epoch' WHERE resource = 'projects';"
+curl -X POST http://localhost:6088/api/sync
+```
 
 ## AI Dashboard
 
@@ -215,6 +255,10 @@ ts1    = TimesheetSummary(1)
 | `ProjectTurnover(projectId)` | project ID | Invoiced / paid / open per year for the project | "…also show the project turnover for each project" |
 | `TurnoverOverview(year?)` | year | Cross-project invoiced / paid / open for one year | "Show the turnover overview for the current year at the top" / "…for 2025" |
 | `StatusBadge` | — | Embedded inside ProjectCard; thresholds set by declaration | — |
+
+**Lump-sum projects**: `BurndownChart(n)` shows the project turnover instead, `TimesheetSummary(n)`
+is skipped, and `ProjectCard(n)` shows agreed lump sum and earned % — whatever the declaration says.
+The AI layout is regenerated when a project's billing mode changes.
 
 Without a month or year, the blocks use the **current** month / year, resolved when the dashboard is
 displayed (a cached layout therefore never shows a stale month). Amounts are the same as in the
@@ -298,6 +342,7 @@ Portainer pulls new images → redeploys stack
 ## Burndown Logic
 
 - **Budget**: `project.budgeted_hours` from InvoiceNinja
+- **Scope**: hourly projects only — lump-sum projects have no burndown (see *Lump-sum projects*)
 - **Ideal line**: Linear from `budgeted_hours` to 0 between start and end date
 - **Actual line**: `budgeted_hours - Σ completed time entries` cumulated
 - **Corrections**: Retroactive changes to time entries affect the entire history (no snapshot locking)
