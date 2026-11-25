@@ -101,7 +101,7 @@ OpenUI Lang syntax rules:
 - Arguments are POSITIONAL — write only values, not key=value pairs
 
 Available components (positional args):
-- ProjectCard(projectId)   — project summary card with built-in status badge; projectId is a number
+- ProjectCard(projectId)   — project summary card (hours, or lump sum for billing_mode "lump_sum") with built-in status badge; projectId is a number
 - BurndownChart(projectId) — burndown chart; projectId is a number
 - ProjectTurnover(projectId) — invoiced/paid/open per year for one project
 - TurnoverOverview(year) — cross-project turnover for one year; year is optional
@@ -114,10 +114,11 @@ Rules:
 3. Every component you define MUST be listed in Dashboard's children array.
 4. Output NOTHING outside the program (no greetings, no explanations).
 5. EVERY project in the list with status "in_progress" MUST appear in the output — including projects with 0 hours logged. Do not skip any project.
-6. Order projects by their \`progress\` field as directed in the declaration.
+6. Keep the order of the project list (it is already sorted as the declaration directs).
 7. Use ProjectTurnover only if the declaration asks for turnover per project; use TurnoverOverview only if it asks for a turnover overview. Never add them otherwise.
 8. Pass a year only if the declaration names a specific year; otherwise write TurnoverOverview() with no argument.
 9. Use TimesheetSummary only if the declaration asks for the timesheet. Pass a month only if the declaration names a specific month; otherwise write TimesheetSummary(projectId) with one argument.
+10. For projects with billing_mode "lump_sum" never use BurndownChart or TimesheetSummary; where the declaration asks for them, use ProjectTurnover(projectId) once instead.
 
 Example for two projects (IDs 1 and 3):
 root = Dashboard([card1, chart1, card3, chart3])
@@ -130,14 +131,24 @@ chart3 = BurndownChart(3)`;
 
 async function streamFromOllama(declarationContent, projects, onToken) {
   const userMessage = `Declaration:\n${declarationContent}\n\nProjects:\n${JSON.stringify(
-    projects.map(p => ({
-      id:             p.id,
-      name:           p.name,
-      budgeted_hours: p.budgeted_hours,
-      total_logged:   p.total_logged,
-      progress:       p.progress,
-      status:         p.status,
-    })),
+    projects.map(p => (p.billing_mode === 'lump_sum'
+      ? {
+          id:           p.id,
+          name:         p.name,
+          billing_mode: 'lump_sum',
+          progress:     null,
+          earned_pct:   p.lump_sum?.earned_pct ?? null,
+          status:       p.status,
+        }
+      : {
+          id:             p.id,
+          name:           p.name,
+          billing_mode:   'hourly',
+          budgeted_hours: p.budgeted_hours,
+          total_logged:   p.total_logged,
+          progress:       p.progress,
+          status:         p.status,
+        })),
     null, 2
   )}\n\nGenerate the dashboard layout now.`;
 
@@ -210,9 +221,25 @@ async function streamFromOllama(declarationContent, projects, onToken) {
 
 // ── Cache + generation ─────────────────────────────────────────────────────
 
+// Hourly projects by budget consumed (desc), then lump-sum projects by lump sum earned (desc, unset last).
+function displayOrder(a, b) {
+  const lsA = a.billing_mode === 'lump_sum';
+  const lsB = b.billing_mode === 'lump_sum';
+  if (lsA !== lsB) return lsA ? 1 : -1;
+  if (!lsA) return b.progress - a.progress;
+  return (b.lump_sum?.earned_pct ?? -1) - (a.lump_sum?.earned_pct ?? -1);
+}
+
 export async function generateOrCachedLayout(writeSSE) {
   const declaration = await readDeclaration();
-  const hash = computeDeclarationHash(declaration);
+  const projects = (await listProjectsWithStats())
+    .filter(p => p.status === 'in_progress')
+    .sort(displayOrder);
+
+  // The layout depends on each project's billing mode (lump-sum projects get turnover instead of
+  // burndown/timesheet) — a mode change after a worker sync must not reuse the old layout.
+  const fingerprint = projects.map(p => `${p.id}:${p.billing_mode}`).sort().join(',');
+  const hash = computeDeclarationHash(`${declaration}\n${fingerprint}`);
 
   if (cache && cache.hash === hash) {
     // Cache hit — serve full layout as a single event
@@ -220,11 +247,7 @@ export async function generateOrCachedLayout(writeSSE) {
     return;
   }
 
-  // Cache miss — fetch projects and stream from Ollama
-  // Sort by budget consumption descending so the model renders them in the declared order
-  const projects = (await listProjectsWithStats())
-    .filter(p => p.status === 'in_progress')
-    .sort((a, b) => b.progress - a.progress);
+  // Cache miss — stream from Ollama
   let accumulated = '';
 
   await streamFromOllama(declaration, projects, (token) => {

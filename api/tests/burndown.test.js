@@ -226,4 +226,33 @@ describe('listProjectsWithStats', () => {
     expect(result[0].progress).toBe(0);
     expect(result[0].remaining).toBe(0);
   });
+  it('adds billing_mode / lump_sum for a tagged project', async () => {
+    query.mockResolvedValueOnce({ rows: [{
+      id: 7, invoiceninja_id: 'x', name: 'LS', budgeted_hours: '0', deadline: null,
+      actual_end_date: null, start_date: null, total_logged: '3',
+      tags: [{ name: 'Pauschalabrechnung' }], cv3: '10000', cv4: 'CHF', invoiced: '2500',
+    }] });
+    const [p] = await listProjectsWithStats();
+    expect(p.billing_mode).toBe('lump_sum');
+    expect(p.lump_sum).toEqual({ agreed: 10000, currency: 'CHF', invoiced: 2500, earned_pct: 25 });
+  });
+
+  it('keeps hourly projects unchanged and drops helper columns', async () => {
+    query.mockResolvedValueOnce({ rows: [{
+      id: 1, invoiceninja_id: 'abc', name: 'P1', budgeted_hours: '100', deadline: '2099-01-01',
+      actual_end_date: null, start_date: '2024-01-01', total_logged: '40',
+      tags: [], cv3: null, cv4: null, invoiced: '0',
+    }] });
+    const [p] = await listProjectsWithStats();
+    expect(p).toMatchObject({ billing_mode: 'hourly', lump_sum: null, progress: 40, remaining: 60, status: 'in_progress' });
+    for (const k of ['tags', 'cv3', 'cv4', 'invoiced']) expect(p).not.toHaveProperty(k);
+  });
+
+  it('selects tags and the invoiced subquery', async () => {
+    query.mockResolvedValueOnce({ rows: [] });
+    await listProjectsWithStats();
+    const sql = query.mock.calls[0][0];
+    expect(sql).toContain("raw->'tags'");
+    expect(sql).toContain('FROM invoices i');
+  });
 });

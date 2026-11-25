@@ -9,7 +9,7 @@ const round2 = (n) => Math.round(n * 100) / 100;
  * dated, not deleted, status sent (2) / partial (3) / paid (4); project not deleted or archived.
  * Shared by the per-project table and the year overview so both show identical amounts.
  */
-const COUNTED = `
+export const COUNTED = `
   i.project_id IS NOT NULL
   AND i.invoice_date IS NOT NULL
   AND NOT i.is_deleted

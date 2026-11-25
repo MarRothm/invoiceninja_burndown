@@ -1,4 +1,6 @@
 import { query } from '../db/pool.js';
+import { COUNTED } from './turnover.js';
+import { lumpSumOf } from './lump-sum.js';
 
 /**
  * Generate an array of dates between start and end (inclusive).
@@ -155,7 +157,11 @@ export async function listProjectsWithStats() {
       p.deadline,
       p.actual_end_date,
       p.start_date,
-      COALESCE(SUM(te.hours) FILTER (WHERE te.status = 'completed'), 0) AS total_logged
+      COALESCE(SUM(te.hours) FILTER (WHERE te.status = 'completed'), 0) AS total_logged,
+      p.raw->'tags'           AS tags,
+      p.raw->>'custom_value3' AS cv3,
+      p.raw->>'custom_value4' AS cv4,
+      (SELECT COALESCE(SUM(i.amount), 0) FROM invoices i WHERE i.project_id = p.id AND ${COUNTED}) AS invoiced
     FROM projects p
     LEFT JOIN time_entries te ON te.project_id = p.id
     WHERE NOT COALESCE((p.raw->>'is_deleted')::boolean, false)
@@ -167,7 +173,7 @@ export async function listProjectsWithStats() {
   `);
 
   const today = new Date().toISOString().slice(0, 10);
-  return res.rows.map(r => {
+  return res.rows.map(({ tags, cv3, cv4, invoiced, ...r }) => {
     const deadlineStr = r.deadline ? new Date(r.deadline).toISOString().slice(0, 10) : null;
     const isClosed    = !!r.actual_end_date || (!!deadlineStr && deadlineStr <= today);
     const budgeted    = parseFloat(r.budgeted_hours);
@@ -179,6 +185,7 @@ export async function listProjectsWithStats() {
       remaining:       isClosed ? 0 : Math.max(budgeted - totalLogged, 0),
       progress:        budgeted > 0 ? Math.round((totalLogged / budgeted) * 100) : 0,
       status:          isClosed ? 'closed' : 'in_progress',
+      ...lumpSumOf({ tags, cv3, cv4, invoiced }),
     };
   });
 }
