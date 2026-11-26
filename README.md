@@ -360,6 +360,7 @@ Portainer pulls new images → redeploys stack
 - **Scope**: hourly projects only — lump-sum projects have no burndown (see *Lump-sum projects*)
 - **Ideal line**: Linear from `budgeted_hours` to 0 between start and end date
 - **Actual line**: `budgeted_hours - Σ completed time entries` cumulated
+- **Daily hours**: bars on their own fixed scale (right axis, 0–10 h, lower third of the chart), equal in every project; days above 10 h are capped and marked ▲, the tooltip shows the real value
 - **Corrections**: Retroactive changes to time entries affect the entire history (no snapshot locking)
 
 ## Running without Traefik

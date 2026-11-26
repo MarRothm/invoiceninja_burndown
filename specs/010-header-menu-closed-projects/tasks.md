@@ -185,7 +185,7 @@ description: "Task list for feature 010: full-width dashboard with menu, closed 
   - Remove every remaining "sidebar" / "€ Turnover in the sidebar" wording.
 - [X] T021 Run `grep -rn -i "sidebar\|€ Turnover\|onSelectProject\|turnoverKey\|reloadKey" README.md frontend/src`, and remove leftovers that refer to the removed sidebar or turnover view. Unrelated matches are fine.
 - [X] T022 Run `npm test` in `api/` (baseline + 1, all green) and `npm run build` in `frontend/`. Then build the frontend Docker image (`docker compose -p ls010 -f docker-compose.yml -f docker-compose.dev.yml build frontend api`). Record the results under "Notes".
-- [ ] T023 Run the browser checks 1–7 from `specs/010-header-menu-closed-projects/quickstart.md` (check 6 on a test stack only; do not pull or delete models on the shared macmini host). Record the results under "Notes". The operator verifies on macmini after a manual Portainer redeploy.
+- [X] T023 Run the browser checks 1–7 from `specs/010-header-menu-closed-projects/quickstart.md` (check 6 on a test stack only; do not pull or delete models on the shared macmini host). Record the results under "Notes". The operator verifies on macmini after a manual Portainer redeploy.
 
 ---
 
@@ -242,4 +242,4 @@ US1 alone already removes the sidebar, keeping € Turnover as a temporary menu 
   - frontend build OK; api and frontend Docker images build;
   - the new turnover SQL (`GROUP BY … p.raw->'tags'`) was checked on a throwaway Postgres 16: same rows and amounts, tags per row.
 - Leftover grep (T021): only unrelated matches remain (`reloadKey` in TimesheetModal and ProjectTurnover, `aiReloadKey`).
-- Browser checks (T023): _open_. Quickstart checks 1–7 are for the operator (check 6 on a test stack only).
+- Browser checks (T023): the operator confirmed on 2026-11-26 that everything works as designed.
