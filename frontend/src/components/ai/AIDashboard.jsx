@@ -7,7 +7,7 @@ import { fetchProjects, fetchAIDashboard, fetchAIDashboardConfig } from '../../h
 const TIMEOUT_MS = 30_000;
 const STALL_MS   = 15_000; // T047: stall detection — no new token for 15 s
 
-export default function AIDashboard({ theme, ollamaStatus, model = 'qwen2.5:7b', onOpenTimesheet }) {
+export default function AIDashboard({ theme, ollamaStatus, cached = false, model = 'qwen2.5:7b', onOpenTimesheet }) {
   const [response, setResponse]   = useState('');
   const [streaming, setStreaming] = useState(false);
   const [status, setStatus]       = useState('idle'); // idle|loading|streaming|stalled|ready|error|unavailable
@@ -112,9 +112,8 @@ export default function AIDashboard({ theme, ollamaStatus, model = 'qwen2.5:7b',
     fetchAIDashboardConfig().then(cfg => setThresholds(cfg.thresholds)).catch(() => {});
   }, []);
 
-  // T045: Auto-trigger on mount — identical to toggle-click path.
-  // Fixes the localStorage-restore reload bug: the component being mounted means
-  // AI mode is active; don't wait for the ollamaStatus prop to cycle through 'unavailable'.
+  // T045: Auto-trigger on mount — the AI Dashboard is the only dashboard (feature 009);
+  // don't wait for the first ollamaStatus response.
   useEffect(() => {
     load();
     return () => {
@@ -132,6 +131,25 @@ export default function AIDashboard({ theme, ollamaStatus, model = 'qwen2.5:7b',
       load();
     }
   }, [ollamaStatus, load]);
+
+  // Feature 009: no classic fallback — while still waiting for the first token, show the
+  // unavailable message as soon as the status check reports it (instead of after the 30 s
+  // timeout). A cached layout is still served by the API, so it is not interrupted.
+  // 'checking' (no status response yet) is not a verdict and never triggers this.
+  useEffect(() => {
+    if (statusRef.current === 'loading' &&
+        (ollamaStatus === 'unavailable' || ollamaStatus === 'model_missing') &&
+        !cached) {
+      if (closeRef.current) closeRef.current();
+      closeRef.current = null;
+      clearTimeout(timerRef.current);
+      clearTimeout(stallTimerRef.current);
+      timerRef.current = null;
+      stallTimerRef.current = null;
+      setStreaming(false);
+      setStatus('unavailable');
+    }
+  }, [ollamaStatus, cached]);
 
   const contextValue = { projects, theme, thresholds, onOpenTimesheet };
 
@@ -157,6 +175,9 @@ export default function AIDashboard({ theme, ollamaStatus, model = 'qwen2.5:7b',
             </div>
           </>
         )}
+        <div style={{ fontSize: 11, marginTop: 16 }}>
+          The dashboard appears automatically once the AI is available.
+        </div>
       </div>
     );
   }
