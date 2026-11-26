@@ -1,6 +1,7 @@
 import React, { useContext } from 'react';
 import { AIDashboardContext } from './AIDashboardContext.jsx';
 import StatusBadge from './StatusBadge.jsx';
+import Badge from '../Badge.jsx';
 import { formatMoney } from '../../utils/money.js';
 
 export default function ProjectCardAI({ props: { projectId } }) {
@@ -28,6 +29,7 @@ export default function ProjectCardAI({ props: { projectId } }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text, #333)' }}>{name}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {project.status === 'closed' && <Badge>CLOSED</Badge>}
           <StatusBadge props={{ status }} />
           <span style={{ fontSize: 12, color, fontWeight: 700 }}>{progress}%</span>
         </div>
@@ -45,7 +47,7 @@ export default function ProjectCardAI({ props: { projectId } }) {
 }
 
 // Lump-sum project ("Pauschalabrechnung"): agreed lump sum and share earned (invoiced ÷ agreed) — no hours.
-function LumpSumCard({ project: { name, lump_sum } }) {
+function LumpSumCard({ project: { name, status, lump_sum } }) {
   const { agreed, currency, invoiced, earned_pct } = lump_sum ?? {};
   const pct   = earned_pct ?? 0;
   const color = pct > 100 ? 'var(--accent2)' : 'var(--accent)';
@@ -61,11 +63,8 @@ function LumpSumCard({ project: { name, lump_sum } }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{name}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{
-            fontSize: 10, fontWeight: 600, letterSpacing: '0.05em',
-            padding: '2px 8px', borderRadius: 3,
-            background: 'var(--border)', color: 'var(--muted)',
-          }}>LUMP SUM</span>
+          {status === 'closed' && <Badge>CLOSED</Badge>}
+          <Badge>LUMP SUM</Badge>
           {earned_pct != null && <span style={{ fontSize: 12, color, fontWeight: 700 }}>{earned_pct}%</span>}
         </div>
       </div>

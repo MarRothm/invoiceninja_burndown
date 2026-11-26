@@ -107,7 +107,7 @@ describe('getYearTurnover', () => {
 
     expect(t.year).toBe(2026);
     expect(t.projects.map(p => p.id)).toEqual([7, 3]);
-    expect(t.projects[1]).toEqual({ id: 3, name: 'B', invoiced: 900.5, paid: 0, open: 900.5, invoice_count: 2 });
+    expect(t.projects[1]).toEqual({ id: 3, name: 'B', invoiced: 900.5, paid: 0, open: 900.5, invoice_count: 2, billing_mode: 'hourly' });
     expect(t.total).toEqual({ invoiced: 3400.5, paid: 1500, open: 1900.5, invoice_count: 3 });
     expect(t.years_available).toEqual([2026, 2025]);
     expect(vi.mocked(query).mock.calls[0][0]).toContain('status_id IN (2, 3, 4)');
@@ -134,9 +134,28 @@ describe('getYearTurnover', () => {
 
     await getYearTurnover(2026);
 
+    // Only the filter matters: tags may be selected (010 billing_mode), never used in WHERE
     for (const [sql] of vi.mocked(query).mock.calls) {
-      expect(sql).not.toContain('tags');
-      expect(sql).not.toContain('custom_value');
+      const where = (sql.split(/\bWHERE\b/)[1] ?? '').split(/\b(GROUP BY|ORDER BY)\b/)[0];
+      expect(where).not.toContain('tags');
+      expect(where).not.toContain('custom_value');
     }
+  });
+
+  it('adds billing_mode per row from the project tags (010)', async () => {
+    vi.mocked(query)
+      .mockResolvedValueOnce({ rows: [
+        { id: 7, name: 'A', invoiced: '100.00', paid: '0.00',  invoice_count: '1', tags: [{ name: ' pauschalabrechnung ' }] },
+        { id: 3, name: 'B', invoiced: '50.00',  paid: '50.00', invoice_count: '1', tags: [] },
+        { id: 5, name: 'C', invoiced: '25.00',  paid: '0.00',  invoice_count: '1', tags: null },
+      ] })
+      .mockResolvedValueOnce({ rows: [{ year: 2026 }] })
+      .mockResolvedValueOnce(synced);
+
+    const t = await getYearTurnover(2026);
+
+    expect(t.projects.map(p => p.billing_mode)).toEqual(['lump_sum', 'hourly', 'hourly']);
+    for (const p of t.projects) expect(p).not.toHaveProperty('tags');
+    expect(t.total).toEqual({ invoiced: 175, paid: 50, open: 125, invoice_count: 3 });
   });
 });

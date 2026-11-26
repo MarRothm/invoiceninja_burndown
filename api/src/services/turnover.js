@@ -1,4 +1,5 @@
 import { query } from '../db/pool.js';
+import { isLumpSum } from './lump-sum.js';
 
 const YEAR_RE = /^\d{4}$/;
 
@@ -94,13 +95,14 @@ export async function getProjectTurnover(projectId) {
 export async function getYearTurnover(year) {
   const res = await query(`
     SELECT p.id, p.name,
+           p.raw->'tags'       AS tags,
            SUM(i.amount)       AS invoiced,
            SUM(i.paid_to_date) AS paid,
            COUNT(*)            AS invoice_count
     FROM invoices i
     JOIN projects p ON p.id = i.project_id
     WHERE ${COUNTED} AND EXTRACT(YEAR FROM i.invoice_date) = $1
-    GROUP BY p.id, p.name
+    GROUP BY p.id, p.name, p.raw->'tags'
     ORDER BY SUM(i.amount) DESC, p.name ASC
   `, [year]);
 
@@ -115,7 +117,11 @@ export async function getYearTurnover(year) {
   return {
     year,
     years_available: yearsRes.rows.map(r => Number(r.year)),
-    projects:        res.rows.map(r => ({ id: r.id, name: r.name, ...toTurnoverRow(r) })),
+    // billing_mode is display-only (010 LUMP SUM badge) — it never filters rows or totals
+    projects:        res.rows.map(r => ({
+      id: r.id, name: r.name, ...toTurnoverRow(r),
+      billing_mode: isLumpSum(r.tags) ? 'lump_sum' : 'hourly',
+    })),
     total:           totalOf(res.rows),
     last_synced_at:  await lastSynced(),
   };

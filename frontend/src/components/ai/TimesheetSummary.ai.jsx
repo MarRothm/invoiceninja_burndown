@@ -12,23 +12,24 @@ export default function TimesheetSummaryAI({ props: { projectId, month } }) {
   const m = MONTH_RE.test(month ?? '') ? month : currentMonth();
   const { projects, onOpenTimesheet } = useContext(AIDashboardContext);
   const project = projects.find(p => String(p.id) === String(projectId));
-  // Lump-sum projects are not billed by time — no timesheet block (whatever the model emitted)
-  const isLumpSum = project?.billing_mode === 'lump_sum';
+  // Lump-sum projects are not billed by time, closed projects get no timesheet block (010)
+  // — whatever the model emitted
+  const noTimesheet = project?.billing_mode === 'lump_sum' || project?.status === 'closed';
 
   const [data,   setData]   = useState(null);
   const [status, setStatus] = useState('loading');
 
   useEffect(() => {
-    if (isLumpSum) return;
+    if (noTimesheet) return;
     let cancelled = false;
     setStatus('loading');
     fetchTimesheet(projectId, m)
       .then(d  => { if (!cancelled) { setData(d); setStatus('ready'); } })
       .catch(() => { if (!cancelled) setStatus('error'); });
     return () => { cancelled = true; };
-  }, [projectId, m, isLumpSum]);
+  }, [projectId, m, noTimesheet]);
 
-  if (isLumpSum) return null;
+  if (noTimesheet) return null;
 
   const open = () => {
     const target = project ?? data?.project;
