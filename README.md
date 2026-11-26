@@ -113,8 +113,8 @@ GET  /api/ai-dashboard/debug        → Full AI diagnostic (Ollama status, decla
 A monthly timesheet per project lists one total of booked time per calendar day, to transfer
 hours into other systems (customer portals, time-tracking tools, spreadsheets).
 
-- Open it with the **▦** icon on any project card in the sidebar (legacy and AI mode) or the
-  **▦ Timesheet** button in the project header.
+- Open it by clicking a project's **timesheet summary block** on the AI Dashboard; it opens on
+  that block's month.
 - Navigate months with **‹ / ›** (up to the current month). Days without bookings show `0`,
   weekends are shaded.
 - Rows are grouped by ISO week (Mon–Sun) with a **weekly subtotal** after each Sunday, for
@@ -136,12 +136,12 @@ hours into other systems (customer portals, time-tracking tools, spreadsheets).
 Invoices are synced from InvoiceNinja alongside projects and tasks, to show turnover per project
 and calendar year.
 
-- The project detail view (legacy mode) has a **Turnover** table: one row per invoice year,
-  newest first, with **Invoiced**, **Paid** and **Open**, plus a total row. Projects without
-  invoices show "No invoices yet".
-- **€ Turnover** in the sidebar (legacy and AI mode) opens an overview of all projects for one
-  year (‹ / › to change year), sorted by invoiced amount with a total row. Click a project to
-  open its detail view.
+- The AI Dashboard's **project turnover** block shows one row per invoice year, newest first,
+  with **Invoiced**, **Paid** and **Open**, plus a total row. Projects without invoices show
+  "No invoices yet".
+- **€ Turnover** in the sidebar opens an overview of all projects for one year (‹ / › to change
+  year), sorted by invoiced amount with a total row. Click a project (or **€ Turnover** again)
+  to return to the AI Dashboard.
 - Amounts are **gross** (incl. VAT). Payments count in the **year of the invoice** they pay
   (InvoiceNinja's "paid to date", net of refunds; applied credits count as paid), so
   Paid + Open = Invoiced for every year.
@@ -168,9 +168,7 @@ What changes for a lump-sum project (after the next sync):
 
 | View | Hourly project (unchanged) | Lump-sum project |
 |------|----------------------------|------------------|
-| Project card | Hours, budget, progress % | `LUMP SUM` badge, agreed lump sum, **earned %** (no timesheet icon) |
-| Project detail | Hour stats, burndown chart, Timesheet button, turnover | Agreed / Invoiced / Earned, turnover — no burndown, no timesheet |
-| AI Dashboard | Card, burndown, timesheet summary | Lump-sum card, then the project turnover instead of burndown / timesheet |
+| AI Dashboard | Card (hours, budget, progress %), burndown, timesheet summary | Lump-sum card (`LUMP SUM` badge, agreed lump sum, invoiced, **earned %**), then the project turnover instead of burndown / timesheet |
 | Turnover overview | included | included — totals are unaffected by the billing mode |
 
 **Earned %** = invoiced (all years; same counting rules as the Turnover table) ÷ agreed lump sum,
@@ -195,12 +193,16 @@ curl -X POST http://localhost:6088/api/sync
 The AI dashboard generates a live project overview from a plain-language declaration
 file, streamed token-by-token from the Ollama instance on the Docker host.
 
-### Switching Views
+### Dashboard
 
-A toggle in the navigation bar switches between the **legacy dashboard** (default) and
-the **AI-generated dashboard**. Your preference is remembered across page reloads.
-The toggle is disabled when the host Ollama is unreachable or the configured model is not
-installed on it (the UI then shows the `ollama pull <model>` command to run on the host).
+The AI Dashboard is the only dashboard; there is no toggle and no classic project list. The
+sidebar holds **Sync now**, **€ Turnover** and the theme selector.
+
+When the host Ollama is unreachable or the configured model is not installed on it, the main
+area shows the reason within a few seconds (for a missing model, with the `ollama pull <model>`
+command to run on the host). The dashboard appears automatically once the AI is available
+again (status checked every 15 s); a cached layout is still shown meanwhile. **€ Turnover** and
+**Sync now** keep working, and sync errors are shown above the current view.
 
 ### Dashboard composition (declaration)
 

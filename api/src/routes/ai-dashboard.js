@@ -1,7 +1,7 @@
 import { checkOllamaStatus, generateOrCachedLayout, getThresholds, isCached, debugInfo, updateDeclaration } from '../services/ai-dashboard.js';
 
 export async function aiDashboardRoutes(fastify) {
-  // GET /ai-dashboard/status — AI service health check for toggle enablement
+  // GET /ai-dashboard/status — AI service health check (AI availability)
   fastify.get('/ai-dashboard/status', async (req, reply) => {
     const ollama = await checkOllamaStatus();
     return {

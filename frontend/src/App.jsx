@@ -1,39 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import ProjectCard from './components/ProjectCard.jsx';
-import BurndownChart from './components/BurndownChart.jsx';
 import ThemeSelector from './components/ThemeSelector.jsx';
-import DashboardToggle from './components/DashboardToggle.jsx';
 import AIDashboard from './components/ai/AIDashboard.jsx';
 import TimesheetModal from './components/TimesheetModal.jsx';
-import ProjectTurnover from './components/ProjectTurnover.jsx';
 import TurnoverOverview from './components/TurnoverOverview.jsx';
-import { fetchProjects, fetchBurndown, triggerSync, fetchAIStatus } from './hooks/api.js';
+import { triggerSync, fetchAIStatus } from './hooks/api.js';
 import { useTheme } from './hooks/useTheme.js';
-import { formatMoney } from './utils/money.js';
-
-const Stat = ({ label, value, color }) => (
-  <div style={{ textAlign: 'center' }}>
-    <div style={{ fontSize: 22, fontWeight: 700, color: color ?? 'var(--text)', lineHeight: 1 }}>
-      {value}
-    </div>
-    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{label}</div>
-  </div>
-);
 
 export default function App() {
   const { themeKey, setThemeKey, theme } = useTheme();
 
-  const [projects,     setProjects]     = useState([]);
-  const [selected,     setSelected]     = useState(null);
-  const [burndown,     setBurndown]     = useState(null);
-  const [loading,      setLoading]      = useState(true);
-  const [chartLoad,    setChartLoad]    = useState(false);
   const [syncing,      setSyncing]      = useState(false);
   const [error,        setError]        = useState(null);
-  const [dashMode,     setDashMode]     = useState(
-    () => (localStorage.getItem('burndown_dashboard_mode') ?? 'legacy')
-  );
-  const [aiStatus,     setAIStatus]     = useState({ ollama: 'unavailable', cached: false });
+  // 'checking' until the first status response — the dashboard must not judge availability before
+  const [aiStatus,     setAIStatus]     = useState({ ollama: 'checking', cached: false });
   const [aiReloadKey,  setAiReloadKey]  = useState(0);
   const [timesheetProject, setTimesheetProject] = useState(null);
   const [timesheetMonth,   setTimesheetMonth]   = useState(null);
@@ -43,19 +22,8 @@ export default function App() {
   const [view,         setView]         = useState('dashboard');
   const [turnoverKey,  setTurnoverKey]  = useState(0);
 
-  const loadProjects = useCallback(async () => {
-    try {
-      const data = await fetchProjects();
-      setProjects(data);
-      if (!selected && data.length) setSelected(data[0]);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { loadProjects(); }, [loadProjects]);
+  // The classic dashboard is gone — drop its stored preference (feature 009)
+  useEffect(() => { localStorage.removeItem('burndown_dashboard_mode'); }, []);
 
   // Poll AI status on mount and every 15 s (to detect Ollama coming online)
   useEffect(() => {
@@ -65,41 +33,13 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  const handleToggle = (mode) => {
-    setDashMode(mode);
-    localStorage.setItem('burndown_dashboard_mode', mode);
-  };
-
-  // Overview row click: show that project's detail view (legacy mode only has one)
-  const openProjectFromTurnover = (projectId) => {
-    const project = projects.find(p => p.id === projectId);
-    if (project) setSelected(project);
-    setView('dashboard');
-    if (dashMode === 'ai') handleToggle('legacy');
-  };
-
-  // Billing mode from the latest project list (a sync may have changed it)
-  const current         = projects.find(p => p.id === selected?.id) ?? selected;
-  const isLumpSum       = current?.billing_mode === 'lump_sum';
-  const selectedLumpSum = isLumpSum ? current.lump_sum : null;
-
-  useEffect(() => {
-    if (!selected) return;
-    setBurndown(null);
-    // Lump-sum projects have no hour burndown
-    if (isLumpSum) { setChartLoad(false); return; }
-    setChartLoad(true);
-    fetchBurndown(selected.id)
-      .then(setBurndown)
-      .catch(e => setError(e.message))
-      .finally(() => setChartLoad(false));
-  }, [selected?.id, isLumpSum]);
+  // Overview row click: back to the AI Dashboard (the only dashboard)
+  const openProjectFromTurnover = () => setView('dashboard');
 
   const handleSync = async () => {
     setSyncing(true);
     try {
       await triggerSync();
-      await loadProjects();
       setAiReloadKey(k => k + 1);
       setTurnoverKey(k => k + 1);
     } catch (e) {
@@ -124,18 +64,12 @@ export default function App() {
         overflowY: 'auto',
       }}>
 
-        {/* Logo + Toggle */}
+        {/* Logo */}
         <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)' }}>
             Burndown
           </div>
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>via InvoiceNinja</div>
-          <DashboardToggle
-            mode={dashMode}
-            onToggle={handleToggle}
-            aiAvailable={aiStatus.ollama === 'ready'}
-            aiStatus={aiStatus.ollama}
-          />
+          <div style={{ fontSize: 11, color: 'var(--muted)' }}>via InvoiceNinja</div>
         </div>
 
         {/* Sync button */}
@@ -176,18 +110,6 @@ export default function App() {
           € Turnover
         </button>
 
-        {/* Project list */}
-        {loading && <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 24 }}>Loading...</div>}
-        {projects.map(p => (
-          <ProjectCard
-            key={p.id}
-            project={p}
-            selected={selected?.id === p.id}
-            onClick={() => { setSelected(p); setView('dashboard'); }}
-            onOpenTimesheet={p.billing_mode === 'lump_sum' ? undefined : () => setTimesheetProject(p)}
-          />
-        ))}
-
         <div style={{ flex: 1 }} />
         <ThemeSelector themeKey={themeKey} setThemeKey={setThemeKey} />
       </aside>
@@ -195,150 +117,25 @@ export default function App() {
       {/* ── Main ── */}
       <main style={{ flex: 1, padding: '32px 36px', overflowY: 'auto' }}>
 
-        {/* Turnover overview */}
-        {view === 'turnover' && (
-          <TurnoverOverview reloadKey={turnoverKey} onSelectProject={openProjectFromTurnover} />
-        )}
-
-        {/* AI Dashboard view */}
-        {view === 'dashboard' && dashMode === 'ai' && (
-          <AIDashboard key={aiReloadKey} theme={theme} ollamaStatus={aiStatus.ollama} model={aiStatus.model} onOpenTimesheet={openTimesheetFromAI} />
-        )}
-
-        {/* Legacy Dashboard view */}
-        {view === 'dashboard' && dashMode !== 'ai' && (<>
-
+        {/* Sync error — visible in every view */}
         {error && (
           <div style={{ background: 'rgba(218,72,48,0.08)', border: '1px solid var(--danger)', borderRadius: 4, padding: '12px 16px', fontSize: 12, color: 'var(--danger)', marginBottom: 20 }}>
             {error} <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: 'var(--danger)', float: 'right' }}>✕</button>
           </div>
         )}
 
-        {!selected && !loading && (
-          <div style={{ color: 'var(--muted)', fontSize: 14, marginTop: 60, textAlign: 'center' }}>
-            No project selected.
-          </div>
+        {view === 'turnover' ? (
+          <TurnoverOverview reloadKey={turnoverKey} onSelectProject={openProjectFromTurnover} />
+        ) : (
+          <AIDashboard
+            key={aiReloadKey}
+            theme={theme}
+            ollamaStatus={aiStatus.ollama}
+            cached={aiStatus.cached}
+            model={aiStatus.model}
+            onOpenTimesheet={openTimesheetFromAI}
+          />
         )}
-
-        {selected && (
-          <>
-            {/* Header */}
-            <div style={{ marginBottom: 28 }}>
-              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>PROJECT</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <h1 style={{ fontSize: 28, fontWeight: 700, lineHeight: 1.1 }}>
-                  {selected.name}
-                </h1>
-                {!isLumpSum && <button
-                  onClick={() => setTimesheetProject(selected)}
-                  style={{
-                    padding: '6px 12px',
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 4,
-                    color: 'var(--accent)',
-                    fontSize: 12,
-                    transition: 'opacity 0.15s ease-in-out',
-                  }}
-                >
-                  ▦ Timesheet
-                </button>}
-              </div>
-              {selected.deadline && (
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-                  Deadline: {new Date(selected.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
-                </div>
-              )}
-            </div>
-
-            {/* Stats */}
-            {burndown && (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: 1,
-                background: 'var(--border)',
-                border: '1px solid var(--border)',
-                borderRadius: 4,
-                overflow: 'hidden',
-                marginBottom: 28,
-              }}>
-                {[
-                  { label: 'Budget', value: `${burndown.project.budgeted_hours}h` },
-                  { label: 'Logged', value: `${burndown.stats.total_logged}h`, color: 'var(--accent)' },
-                  { label: 'Remaining', value: `${burndown.stats.remaining}h`,
-                    color: burndown.stats.remaining === 0 ? 'var(--accent2)' : 'var(--text)' },
-                  { label: 'Progress', value: `${burndown.stats.progress}%`,
-                    color: burndown.stats.progress > 100 ? 'var(--accent2)' : 'var(--accent3)' },
-                ].map(s => (
-                  <div key={s.label} style={{ background: 'var(--card)', padding: '18px 0' }}>
-                    <Stat {...s} />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Lump-sum stats: agreed / invoiced / earned */}
-            {isLumpSum && (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: 1,
-                background: 'var(--border)',
-                border: '1px solid var(--border)',
-                borderRadius: 4,
-                overflow: 'hidden',
-                marginBottom: 28,
-              }}>
-                {[
-                  { label: 'Agreed lump sum',
-                    value: selectedLumpSum.agreed == null ? 'Not set' : formatMoney(selectedLumpSum.agreed, selectedLumpSum.currency) },
-                  { label: 'Invoiced', value: formatMoney(selectedLumpSum.invoiced, selectedLumpSum.currency), color: 'var(--accent)' },
-                  { label: 'Earned',
-                    value: selectedLumpSum.earned_pct == null ? '—' : `${selectedLumpSum.earned_pct}%`,
-                    color: selectedLumpSum.earned_pct > 100 ? 'var(--accent2)' : 'var(--accent3)' },
-                ].map(s => (
-                  <div key={s.label} style={{ background: 'var(--card)', padding: '18px 0' }}>
-                    <Stat {...s} />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Chart */}
-            {!isLumpSum && (<>
-            <div style={{
-              background: 'var(--card)',
-              border: '1px solid var(--border)',
-              borderRadius: 4,
-              padding: '24px 20px 16px',
-            }}>
-              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>BURNDOWN CHART</div>
-              {chartLoad && (
-                <div style={{ height: 360, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>
-                  Calculating...
-                </div>
-              )}
-              {burndown && !chartLoad && (
-                <BurndownChart
-                  data={burndown.burndown}
-                  barFill={theme.barFill}
-                  barStroke={theme.barStroke}
-                />
-              )}
-            </div>
-
-            {/* Legend note */}
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 14, display: 'flex', gap: 24 }}>
-              <span><span style={{ color: 'var(--accent3)' }}>──</span> Ideal</span>
-              <span><span style={{ color: 'var(--accent)' }}>──</span> Actual</span>
-            </div>
-            </>)}
-
-            <ProjectTurnover projectId={selected.id} reloadKey={turnoverKey} />
-          </>
-        )}
-        </>)} {/* end legacy view */}
       </main>
 
       {timesheetProject && (
