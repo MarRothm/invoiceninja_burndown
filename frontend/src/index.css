@@ -43,8 +43,8 @@ body::before {
 a { color: inherit; text-decoration: none; }
 button { cursor: pointer; font: inherit; }
 
-/* Sidebar: InvoiceNinja dark sidebar palette (always fixed) */
-.sidebar {
+/* Header: InvoiceNinja dark palette (always fixed) */
+.app-header {
   background:    #2f2f2f;
   color:         #aaaaaa;
   --surface:     #363636;

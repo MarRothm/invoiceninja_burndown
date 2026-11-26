@@ -3,11 +3,42 @@ import { Renderer } from '@openuidev/react-lang';
 import { library } from './components.js';
 import { AIDashboardContext } from './AIDashboardContext.jsx';
 import { fetchProjects, fetchAIDashboard, fetchAIDashboardConfig } from '../../hooks/api.js';
+import TurnoverOverview from '../TurnoverOverview.jsx';
+import ProjectCardAI from './ProjectCard.ai.jsx';
+import BurndownChartAI from './BurndownChart.ai.jsx';
 
 const TIMEOUT_MS = 30_000;
 const STALL_MS   = 15_000; // T047: stall detection — no new token for 15 s
 
-export default function AIDashboard({ theme, ollamaStatus, cached = false, model = 'qwen2.5:7b', onOpenTimesheet }) {
+// Same order as the API's displayOrder: hourly by budget consumed, then lump sum by earned %.
+function closedOrder(a, b) {
+  const lsA = a.billing_mode === 'lump_sum';
+  const lsB = b.billing_mode === 'lump_sum';
+  if (lsA !== lsB) return lsA ? 1 : -1;
+  if (!lsA) return b.progress - a.progress;
+  return (b.lump_sum?.earned_pct ?? -1) - (a.lump_sum?.earned_pct ?? -1);
+}
+
+// Feature 010: closed projects are not sent to the AI — a fixed section below the generated
+// layout, built from the same blocks: card + burndown (BurndownChart shows the project turnover
+// for lump-sum projects). Never a timesheet block.
+function ClosedProjects({ projects }) {
+  const closed = projects.filter(p => p.status === 'closed').sort(closedOrder);
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 24, marginBottom: 12 }}>CLOSED PROJECTS</div>
+      {closed.length === 0 && <div style={{ fontSize: 12, color: 'var(--muted)' }}>No closed projects.</div>}
+      {closed.map(p => (
+        <React.Fragment key={p.id}>
+          <ProjectCardAI props={{ projectId: p.id }} />
+          <BurndownChartAI props={{ projectId: p.id }} />
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+export default function AIDashboard({ theme, ollamaStatus, cached = false, model = 'qwen2.5:7b', showClosed = false, onOpenTimesheet }) {
   const [response, setResponse]   = useState('');
   const [streaming, setStreaming] = useState(false);
   const [status, setStatus]       = useState('idle'); // idle|loading|streaming|stalled|ready|error|unavailable
@@ -178,6 +209,10 @@ export default function AIDashboard({ theme, ollamaStatus, cached = false, model
         <div style={{ fontSize: 11, marginTop: 16 }}>
           The dashboard appears automatically once the AI is available.
         </div>
+        {/* Turnover needs no AI — stays visible during an outage (010 Q3) */}
+        <div style={{ textAlign: 'left', marginTop: 32 }}>
+          <TurnoverOverview />
+        </div>
       </div>
     );
   }
@@ -284,6 +319,7 @@ export default function AIDashboard({ theme, ollamaStatus, cached = false, model
             }}
           />
         )}
+        {showClosed && status === 'ready' && <ClosedProjects projects={projects} />}
       </div>
     </AIDashboardContext.Provider>
   );
